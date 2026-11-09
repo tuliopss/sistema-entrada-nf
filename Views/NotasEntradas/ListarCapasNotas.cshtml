@@ -1,0 +1,487 @@
+﻿@model SistemaEntradaNotaFiscal.PagedResult<SistemaEntradaNotaFiscal.Models.NotasEntrada>
+@{
+    ViewData["Title"] = "Notas de Entrada";
+    string Link(int p) => Url.Action("ListarCapasNotas", new {
+        page = p,
+        codFor = ViewData["codFor"],
+        minDate = ViewData["minDate"],
+        maxDate = ViewData["maxDate"]
+    })!;
+    var primeiro = Model.TotalCount == 0 ? 0 : (Model.Page - 1) * Model.PageSize + 1;
+    var ultimo = primeiro == 0 ? 0 : primeiro + Model.Items.Count - 1;
+}
+<h4 class="mb-3">Notas Fiscais de Devolução:</h4>
+
+<div asp-validation-summary="ModelOnly" class="text-danger mb-2"></div>
+
+<form method="get" asp-action="ListarCapasNotas" class="row g-2 align-items-end mb-3">
+    <div class="col-auto">
+        <label for="codFor" class="form-label mb-0">Fornecedor</label>
+        <input type="text" id="codFor" name="codFor" class="form-control form-control-sm"
+               value="@ViewData["codFor"]" />
+    </div>
+    <div class="col-auto">
+        <label for="minDate" class="form-label mb-0">Emissão de</label>
+        <input type="date" id="minDate" name="minDate" class="form-control form-control-sm"
+               value="@ViewData["minDate"]" />
+    </div>
+    <div class="col-auto">
+        <label for="maxDate" class="form-label mb-0">até</label>
+        <input type="date" id="maxDate" name="maxDate" class="form-control form-control-sm"
+               value="@ViewData["maxDate"]" />
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary btn-sm">Buscar</button>
+    </div>
+    <div class="col-auto">
+        @* type="button": só o Buscar deve enviar o formulário de filtro *@
+        <button type="button" class="btn btn-success btn-sm" id="btnProcessar">Processar</button>
+    </div>
+    <div class="col-auto">
+        <button type="button" class="btn btn-warning btn-sm">Reabilitar</button>
+    </div>
+</form>
+
+<datalist id="listaTns">
+    @foreach (var t in (ViewData["Transacoes"] as IEnumerable<string>) ?? Enumerable.Empty<string>()) {
+        <option value="@t"></option>
+    }
+</datalist>
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <span class="text-muted small"><span id="contadorAlteradas">0</span> nota(s) com alterações</span>
+    <span class="text-muted small">Mostrando @primeiro–@ultimo de @Model.TotalCount notas</span>
+
+</div>
+
+<div class="table-responsive">
+    <table class="table table-sm table-hover table-bordered align-middle" id="gridNotas">
+        <thead class="table-light">
+            <tr>
+                <th>Filial</th>
+                <th>Nº Nota</th>
+                <th>Série</th>
+                <th>Fornecedor</th>
+                <th>Emissão</th>
+                <th>Entrada</th>
+                <th>Transação</th>
+                <th>Situação</th>
+                <th class="text-end">Valor Líquido</th>
+                <th class="text-center" style="width: 90px;">
+                    Ações
+                    <input type="checkbox" class="form-check-input ms-1" title="Marcar todas" />
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var nota in Model.Items) {
+                @* A chave original da nota fica no <tr>, onde ninguém edita *@
+                <tr data-emp="@nota.CodEmp" data-fil="@nota.CodFil" data-for="@nota.CodFor"
+                    data-num="@nota.NumNfc" data-snf="@nota.CodSnf">
+                    <td>
+                        <input type="number" class="form-control form-control-sm campo-editavel"
+                               data-campo="CodFil" value="@nota.CodFil" style="width: 80px;" />
+                    </td>
+                    <td>@nota.NumNfc</td>
+                    <td>
+                        <input type="text" class="form-control form-control-sm campo-editavel"
+                               data-campo="CodSnf" maxlength="3" value="@nota.CodSnf" style="width: 70px;" />
+                    </td>
+                    <td>@nota.CodFor - @nota.Fornecedor?.NomFor</td>
+                    <td>
+                        <input type="date" class="form-control form-control-sm campo-editavel"
+                               data-campo="DatEmi" value="@nota.DatEmi.ToString("yyyy-MM-dd")" />
+                    </td>
+                    <td>
+                        <input type="date" class="form-control form-control-sm campo-editavel"
+                               data-campo="DatEnt" value="@nota.DatEnt.ToString("yyyy-MM-dd")" />
+                    </td>
+                    <td>
+                        <input type="text" class="form-control form-control-sm campo-editavel"
+                               data-campo="TnsPro" list="listaTns" maxlength="5"
+                               value="@nota.TnsPro" style="width: 90px;" />
+                    </td>
+                    <td>
+                        <input type="text" class="form-control form-control-sm campo-editavel"
+                               data-campo="SitNfc" value="@nota.SitNfc" style="width: 70px;" />
+                    </td>
+                    <td>
+                        <input type="text" inputmode="decimal" class="form-control form-control-sm text-end campo-editavel"
+                               data-campo="VlrLiq"
+                               value="@nota.VlrLiq.ToString("N2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))"
+                               style="width: 120px;" />
+                    </td>
+                    <td class="text-center text-nowrap">
+                        @* Checkbox: apenas visual, sem comportamento *@
+                        <input type="checkbox" class="form-check-input me-2" />
+                        <button type="button" class="btn btn-link btn-sm p-0 btn-ver-itens" title="Ver itens da nota">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z" />
+                                <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0" />
+                            </svg>
+                        </button>
+                    </td>
+                </tr>
+            }
+            @if (!Model.Items.Any()) {
+                <tr>
+                    <td colspan="10" class="text-center text-muted py-3">Nenhuma nota encontrada para o filtro informado.</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@if (Model.TotalPages > 1) {
+    <nav aria-label="Paginação das notas" class="mt-2">
+        <ul class="pagination pagination-sm justify-content-center mb-0">
+            <li class="page-item @(Model.Page == 1 ? "disabled" : "")">
+                <a class="page-link link-pagina" href="@Link(Model.Page - 1)">Anterior</a>
+            </li>
+            @for (int p = Math.Max(1, Model.Page - 2); p <= Math.Min(Model.TotalPages, Model.Page + 2); p++) {
+                <li class="page-item @(p == Model.Page ? "active" : "")">
+                    <a class="page-link link-pagina" href="@Link(p)">@p</a>
+                </li>
+            }
+            <li class="page-item @(Model.Page == Model.TotalPages ? "disabled" : "")">
+                <a class="page-link link-pagina" href="@Link(Model.Page + 1)">Próxima</a>
+            </li>
+        </ul>
+    </nav>
+}
+
+@* Modal: uma vez só, fora da tabela e fora do formulário de filtro *@
+<div class="modal fade" id="modalItens" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalItensTitulo">Nota</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div id="modalItensErro" class="alert alert-danger d-none"></div>
+                <div id="modalItensCarregando" class="text-muted">Carregando itens...</div>
+                <table class="table table-sm table-bordered align-middle d-none" id="tabelaItens">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Seq.</th>
+                            <th>Cód. Produto</th>
+                            <th>Produto</th>
+                            <th>Qtde</th>
+                            <th>Preço Unitário</th>
+                            <th>Vlr. Líquido</th>
+                            <th>Vlr. Bruto</th>
+                            <th>Transação</th>
+                            <th>Motivo</th>
+                            <th>Base ICMS ST</th>
+                            <th>Base ICMS</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success btn-sm" id="btnOkItens">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .campo-alterado {
+        background-color: #fff3cd;
+        border-color: #ffc107;
+    }
+</style>
+
+@section Scripts {
+    <script>
+        (function () {
+            const URL_ITENS = '@Url.Action("ListarItensNotas", "NotasEntradas")';
+            const URL_PRODUTO = '@Url.Action("BuscarProduto", "NotasEntradas")';
+            const modalEl = document.getElementById('modalItens');
+            const tbodyItens = document.querySelector('#tabelaItens tbody');
+            const notasAlteradas = [];
+
+            const estado = {};   // chave da nota -> { original: [...], atual: [...] }
+            let chaveAberta = null, botaoAberto = null, trabalho = [];
+
+
+            const camposItem = [
+                { k: 'codPro',     tipo: 'text',   maxlength: 14 },
+                { k: 'qtdRec',     tipo: 'number', step: '0.00001' },
+                { k: 'preUni',     tipo: 'number', step: '0.01' },
+                { k: 'vlrLiq',     tipo: 'number', step: '0.01' },
+                { k: 'vlrBru',     tipo: 'number', step: '0.01' },
+                { k: 'tnsPro',     tipo: 'text',   maxlength: 5 },
+                { k: 'usU_CodMot', tipo: 'text' },   // nome que o JSON devolve para USU_CodMot
+                { k: 'vlrBsi',     tipo: 'number', step: '0.01' },
+                { k: 'vlrBic',     tipo: 'number', step: '0.01' }
+            ];
+
+            const esc = s => String(s ?? '').replace(/[&<>"']/g,
+                c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+            const diferente = (a, b) => (a ?? '') !== (b ?? '');
+            const clonar = o => JSON.parse(JSON.stringify(o));
+
+            // ---------- Grid principal: destaque das alterações ----------
+            function atualizarContador() {
+                document.getElementById('contadorAlteradas').textContent =
+                    document.querySelectorAll('#gridNotas tbody tr.table-warning').length;
+            }
+
+            function marcarLinha(tr) {
+                const alterada = tr.querySelector('.campo-alterado') !== null
+                              || tr.querySelector('.btn-ver-itens.text-warning') !== null;
+                tr.classList.toggle('table-warning', alterada);
+                atualizarContador();
+            }
+
+            document.querySelectorAll('#gridNotas .campo-editavel').forEach(el => {
+                el.dataset.original = el.value;
+                el.addEventListener('input', () => {
+                    el.classList.toggle('campo-alterado', el.value !== el.dataset.original);
+                    marcarLinha(el.closest('tr'));
+                });
+            });
+
+            function confirmarDescarte() {
+            const pendentes = document.querySelectorAll('#gridNotas tbody tr.table-warning').length;
+            return pendentes === 0 ||
+                   confirm('Há notas com alterações não gravadas. Continuar vai descartá-las. Continuar?');
+        }
+
+        document.querySelector('form[method="get"]').addEventListener('submit', e => {
+            if (!confirmarDescarte()) e.preventDefault();
+        });
+
+        document.querySelectorAll('.link-pagina').forEach(a =>
+            a.addEventListener('click', e => { if (!confirmarDescarte()) e.preventDefault(); }));
+
+            // ---------- Popup de itens ----------
+            function chaveDaLinha(tr) {
+                const d = tr.dataset;
+                return `${d.emp}-${d.fil}-${d.for}-${d.num}-${d.snf}`;
+            }
+
+            function inputHtml(c, idx, valor, alterado) {
+                const extra = c.tipo === 'number' ? `step="${c.step}"` : (c.maxlength ? `maxlength="${c.maxlength}"` : '');
+                return `<input type="${c.tipo}" ${extra} class="form-control form-control-sm ${alterado ? 'campo-alterado' : ''}"
+                               data-idx="${idx}" data-campo="${c.k}" value="${esc(valor)}" />`;
+            }
+
+            function renderizarItens() {
+                const original = estado[chaveAberta].original;
+                tbodyItens.innerHTML = trabalho.map((it, idx) => {
+                    const alt = k => diferente(it[k], original[idx][k]);
+                    const cel = k => `<td>${inputHtml(camposItem.find(c => c.k === k), idx, it[k], alt(k))}</td>`;
+                    return `<tr>
+                        <td>${esc(it.seqIpc)}</td>
+                        ${cel('codPro')}
+                        <td><span class="descricao-produto" data-idx="${idx}">${esc(it.produto?.desPro ?? '')}</span></td>
+                        ${cel('qtdRec')}${cel('preUni')}${cel('vlrLiq')}${cel('vlrBru')}${cel('tnsPro')}
+                        ${cel('usU_CodMot')}${cel('vlrBsi')}${cel('vlrBic')}
+                    </tr>`;
+                }).join('');
+            }
+
+            tbodyItens.addEventListener('input', e => {
+                const el = e.target;
+                if (!el.dataset.campo) return;
+                const idx = Number(el.dataset.idx), campo = el.dataset.campo;
+                const numerico = camposItem.find(c => c.k === campo).tipo === 'number';
+                trabalho[idx][campo] = numerico ? (el.value === '' ? null : parseFloat(el.value)) : el.value;
+                el.classList.toggle('campo-alterado',
+                    diferente(trabalho[idx][campo], estado[chaveAberta].original[idx][campo]));
+            });
+
+            // Consulta a descrição do novo código, sem reconstruir o modal.
+            const consultasProduto = new Map();
+
+            async function buscarDescricaoProduto(idx, codPro, chaveNota) {
+            const label = tbodyItens.querySelector(`.descricao-produto[data-idx="${idx}"]`);
+            const item = trabalho[idx];
+            if (!label || !item) return;
+
+            const codigo = codPro.trim();
+            const token = (consultasProduto.get(idx) ?? 0) + 1;
+            consultasProduto.set(idx, token);
+
+            const descricaoOriginal = estado[chaveNota].original[idx].produto?.desPro ?? '';
+
+            if (!codigo) {
+                item.produto = null;
+                label.textContent = '';
+                label.classList.toggle('campo-alterado', descricaoOriginal !== '');
+                return;
+            }
+
+            label.textContent = 'Buscando...';
+
+            try {
+                const url = `${URL_PRODUTO}?${new URLSearchParams({ codPro: codigo })}`;
+                const resp = await fetch(url, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+
+                if (!resp.ok) throw new Error(resp.status === 404
+                    ? 'Produto não encontrado' : `Erro HTTP ${resp.status}`);
+
+                const produto = await resp.json();
+
+                if (chaveAberta !== chaveNota || trabalho[idx] !== item ||
+                    consultasProduto.get(idx) !== token ||
+                    item.codPro?.trim() !== codigo) return;
+
+                item.produto = produto;
+
+                const descricaoAtual = produto.desPro ?? produto.DesPro ?? '';
+
+                label.textContent = descricaoAtual;
+
+                // Destaca a descrição quando diferente da original
+                label.classList.toggle(
+                    'campo-alterado',
+                    descricaoAtual !== descricaoOriginal
+                );
+
+            } catch (erro) {
+                if (chaveAberta !== chaveNota || trabalho[idx] !== item ||
+                    consultasProduto.get(idx) !== token ||
+                    item.codPro?.trim() !== codigo) return;
+
+                item.produto = null;
+                label.textContent = erro.message;
+                label.classList.add('campo-alterado');
+            }
+        }
+
+            // Executa a consulta ao terminar de editar o código do produto.
+            tbodyItens.addEventListener('change', async e => {
+                const el = e.target;
+                if (el.dataset.campo !== 'codPro') return;
+                const idx = Number(el.dataset.idx);
+                const codigo = el.value.trim();
+                trabalho[idx].codPro = codigo;
+                await buscarDescricaoProduto(idx, codigo, chaveAberta);
+            });
+
+            document.addEventListener('click', async e => {
+                const btn = e.target.closest('.btn-ver-itens');
+                if (!btn) return;
+
+                if (typeof bootstrap === 'undefined') {
+                    alert('O JavaScript do Bootstrap não foi carregado. Confira o _Layout.cshtml.');
+                    return;
+                }
+
+                const tr = btn.closest('tr');
+                chaveAberta = chaveDaLinha(tr);
+                consultasProduto.clear();
+                botaoAberto = btn;
+
+                document.getElementById('modalItensTitulo').textContent = `Nota ${tr.dataset.num}`;
+                const erro = document.getElementById('modalItensErro');
+                const carregando = document.getElementById('modalItensCarregando');
+                const tabela = document.getElementById('tabelaItens');
+                erro.classList.add('d-none');
+                tabela.classList.add('d-none');
+                carregando.classList.remove('d-none');
+                bootstrap.Modal.getOrCreateInstance(modalEl).show();
+
+                try {
+                    if (!estado[chaveAberta]) {
+                        const qs = new URLSearchParams({
+                            numNfc: tr.dataset.num, codEmp: tr.dataset.emp, codFil: tr.dataset.fil,
+                            codFor: tr.dataset.for, codSnf: tr.dataset.snf
+                        });
+                        // const resp = await fetch(`${URL_ITENS}?${qs}`);
+                        // if (!resp.ok) throw new Error(`Falha ao buscar os itens (HTTP ${resp.status}).`);
+                        const resp = await fetch(`${URL_ITENS}?${qs}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                        if (resp.status === 401) throw new Error('Sua sessão expirou. Entre novamente (alterações não gravadas serão perdidas).');
+                        if (!resp.ok) throw new Error(`Falha ao buscar os itens (HTTP ${resp.status}).`);
+                        if (!(resp.headers.get('content-type') || '').includes('application/json'))
+                            throw new Error('A resposta não é JSON. Confira se a action ListarItensNotas devolve Json/Ok.');
+                        const itens = await resp.json();
+                        estado[chaveAberta] = { original: itens, atual: clonar(itens) };
+                    }
+                    trabalho = clonar(estado[chaveAberta].atual);
+
+                    if (trabalho.length === 0) {
+                        erro.textContent = 'Esta nota não possui itens.';
+                        erro.classList.remove('d-none');
+                    } else {
+                        renderizarItens();
+                        tabela.classList.remove('d-none');
+                    }
+                } catch (ex) {
+                    erro.textContent = ex.message;
+                    erro.classList.remove('d-none');
+                } finally {
+                    carregando.classList.add('d-none');
+                }
+            });
+
+            document.getElementById('btnOkItens').addEventListener('click', () => {
+                const e = estado[chaveAberta];
+                if (e) {
+                    e.atual = clonar(trabalho);
+                    const mudou = e.atual.some((it, i) => camposItem.some(c => diferente(it[c.k], e.original[i][c.k])));
+                    botaoAberto.classList.toggle('text-warning', mudou);   // olho amarelo = itens alterados
+                    marcarLinha(botaoAberto.closest('tr'));
+                }
+                bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+            });
+                document.getElementById("btnProcessar")
+        .addEventListener("click", async function () {
+
+            const btn = this;
+
+     
+            const notasAlteradas = [];
+
+            
+
+            btn.disabled = true;
+
+            try {
+                const token = document.querySelector(
+                    'input[name="__RequestVerificationToken"]'
+                )?.value;
+
+                const response = await fetch(
+                    '@Url.Action("ProcessarNotas", "NotasEntradas")',
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "RequestVerificationToken": token ?? ""
+                        },
+                        body: JSON.stringify(notasAlteradas)
+                    }
+                );
+
+                if (!response.ok) {
+                    throw new Error(
+                        `Erro HTTP ${response.status}`
+                    );
+                }
+
+                const resultado = await response.json();
+
+                console.log("Resultado do processamento:", resultado);
+
+                alert("Requisição enviada ao Controller!");
+
+            } catch (erro) {
+                console.error("Erro ao processar notas:", erro);
+                alert("Erro ao processar: " + erro.message);
+            } finally {
+                btn.disabled = false;
+            }
+        });
+        
+        })();
+    </script>
+}

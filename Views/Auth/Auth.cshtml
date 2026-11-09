@@ -1,0 +1,82 @@
+﻿@model SistemaEntradaNotaFiscal.Models.LoginViewModel
+@{
+    ViewData["Title"] = "Entrar";
+}
+
+<div class="row justify-content-center mt-5">
+    <div class="col-12 col-sm-8 col-md-6 col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h4 class="mb-1">Entrada de Notas Fiscais</h4>
+                <p class="text-muted small mb-4">Acesse com o seu usuário e senha do ERP.</p>
+                
+                    <form asp-controller="Auth" asp-action="Auth" asp-route-returnUrl="@ViewData["ReturnUrl"]"  method="post" id="formLogin">
+                    @* Erros gerais (ex.: usuário ou senha inválidos) *@
+                    <div asp-validation-summary="ModelOnly" class="text-danger small mb-3"></div>
+
+                    <div class="mb-3">
+                        <label asp-for="Usuario" class="form-label"></label>
+                        <input asp-for="Usuario" class="form-control" autocomplete="username" autofocus required />
+                        <span asp-validation-for="Usuario" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Senha" class="form-label"></label>
+                        <div class="input-group">
+                            <input asp-for="Senha" class="form-control" autocomplete="current-password" required />
+                            <button type="button" class="btn btn-outline-secondary d-flex align-items-center" id="btnToggleSenha" tabindex="-1" aria-label="Mostrar senha">
+                                @* Olho aberto: senha oculta (clique para ver) *@
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16" id="btnVerSenha">
+                                    <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z" />
+                                    <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0" />
+                                </svg>
+                                @* Olho cortado: senha visível (clique para ocultar) *@
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="btnOcultarSenha" class="d-none">
+                                    <path d="M2 2L22 22" />
+                                    <path d="M6.71277 6.7226C3.66479 8.79527 2 12 2 12C2 12 5.63636 19 12 19C14.0503 19 15.8174 18.2734 17.2711 17.2884M11 5.05822C11.3254 5.02013 11.6588 5 12 5C18.3636 5 22 12 22 12C22 12 21.3082 13.3317 20 14.8335" />
+                                    <path d="M14 14.2362C13.4692 14.7112 12.7684 15.0001 12 15.0001C10.3431 15.0001 9 13.657 9 12.0001C9 11.1764 9.33193 10.4303 9.86932 9.88818" />
+                                </svg>
+                            </button>
+                        </div>
+                        <span asp-validation-for="Senha" class="text-danger small"></span>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100" id="btnEntrar">Entrar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const senha = document.getElementById('Senha');
+            const btnToggle = document.getElementById('btnToggleSenha');
+            const iconeVer = document.getElementById('btnVerSenha');          // olho aberto
+            const iconeOcultar = document.getElementById('btnOcultarSenha');  // olho cortado
+            const btnEntrar = document.getElementById('btnEntrar');
+
+            // Mostrar / ocultar a senha digitada
+            btnToggle.addEventListener('click', () => {
+                const mostrar = senha.type === 'password';
+                senha.type = mostrar ? 'text' : 'password';
+                iconeVer.classList.toggle('d-none', mostrar);
+                iconeOcultar.classList.toggle('d-none', !mostrar);
+                btnToggle.setAttribute('aria-label', mostrar ? 'Ocultar senha' : 'Mostrar senha');
+            });
+
+            // Evita duplo clique enquanto a requisição está em andamento
+            document.getElementById('formLogin').addEventListener('submit', () => {
+                btnEntrar.disabled = true;
+                btnEntrar.textContent = 'Entrando...';
+            });
+
+            // Ao voltar pelo botão "voltar" do navegador, libera o botão novamente
+            window.addEventListener('pageshow', () => {
+                btnEntrar.disabled = false;
+                btnEntrar.textContent = 'Entrar';
+            });
+        })();
+    </script>
+}
