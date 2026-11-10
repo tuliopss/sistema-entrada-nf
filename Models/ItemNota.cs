@@ -17,6 +17,7 @@ namespace SistemaEntradaNotaFiscal.Models {
       public Produto? produto { get; set; }
 
       [Column("CodPro")] public string CodPro { get; set; } = string.Empty;
+      [Column("CodDer"), MaxLength(7)] public string? CodDer { get; set; }
       [Column("QtdRec")] public decimal QtdRec { get; set; }
       [Column("PreUni")] public decimal PreUni { get; set; }
       [Column("VlrLiq")] public decimal VlrLiq { get; set; }

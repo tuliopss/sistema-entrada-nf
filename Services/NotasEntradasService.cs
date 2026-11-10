@@ -53,13 +53,17 @@ namespace SistemaEntradaNotaFiscal.Services {
         }
 
 
-        public async Task<List<ItemNota>> ListarItens(int numNfc, short codEmp, int codFil, int codFor, string codSnf) {
-            var query = from obj in _context.ItemNota select obj;
+        public async Task<List<ItemNota>> ListarItens(
+            int numNfc, short codEmp, int codFil, int codFor, string codSnf,
+            CancellationToken ct, bool incluirProduto = true) {
+            var itens = _context.ItemNota
+                .AsNoTracking()
+                .Where(n => n.NumNfc == numNfc && n.CodEmp == codEmp && n.CodFil == codFil && n.CodFor == codFor && n.CodSnf == codSnf);
 
-            return await query
-                        .Where(n => n.NumNfc == numNfc && n.CodEmp == codEmp && n.CodFil == codFil && n.CodFor == codFor && n.CodSnf == codSnf)
-                        .Include(p => p.produto)
-                        .ToListAsync();
+            if (incluirProduto)
+                itens = itens.Include(i => i.produto);
+
+            return await itens.OrderBy(n => n.SeqIpc).ToListAsync(ct);
         }
 
         //public async Task<NotasEntrada> Teste(GravarNotaDTO) {

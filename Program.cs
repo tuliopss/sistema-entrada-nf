@@ -14,14 +14,9 @@ builder.Services.AddDbContext<HmlContext>(options =>
         )
 );
 
-builder.Configuration["SENIOR:URL"] =
-    Environment.GetEnvironmentVariable("SENIOR_URL");
-
-builder.Configuration["Senior:Usuario"] =
-    Environment.GetEnvironmentVariable("SENIOR_USUARIO");
-
-builder.Configuration["Senior:Senha"] =
-    Environment.GetEnvironmentVariable("SENIOR_SENHA");
+builder.Configuration["Senior:Url"] ??= builder.Configuration["SENIOR_URL"];
+builder.Configuration["Senior:Usuario"] ??= builder.Configuration["SENIOR_USUARIO"];
+builder.Configuration["Senior:Senha"] ??= builder.Configuration["SENIOR_SENHA"];
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddScoped<NotasEntradasService>();

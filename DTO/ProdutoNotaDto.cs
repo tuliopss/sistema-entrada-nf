@@ -3,6 +3,7 @@ public class ProdutoNotaDto {
     public short SeqIpc { get; set; }
 
     public string CodPro { get; set; } = "";
+    public string? CodDer { get; set; }
     public string TnsPro { get; set; } = "";
 
     public decimal QtdRec { get; set; }

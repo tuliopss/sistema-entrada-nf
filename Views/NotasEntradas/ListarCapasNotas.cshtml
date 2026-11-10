@@ -42,6 +42,9 @@
     </div>
 </form>
 
+<div id="tokenProcessamento" hidden>@Html.AntiForgeryToken()</div>
+<div id="resultadoProcessamento" class="mb-3" aria-live="polite"></div>
+
 <datalist id="listaTns">
     @foreach (var t in (ViewData["Transacoes"] as IEnumerable<string>) ?? Enumerable.Empty<string>()) {
         <option value="@t"></option>
@@ -79,37 +82,31 @@
                 <tr data-emp="@nota.CodEmp" data-fil="@nota.CodFil" data-for="@nota.CodFor"
                     data-num="@nota.NumNfc" data-snf="@nota.CodSnf">
                     <td>
-                        <input type="number" class="form-control form-control-sm campo-editavel"
-                               data-campo="CodFil" value="@nota.CodFil" style="width: 80px;" />
+                        @nota.CodFil
                     </td>
                     <td>@nota.NumNfc</td>
                     <td>
-                        <input type="text" class="form-control form-control-sm campo-editavel"
-                               data-campo="CodSnf" maxlength="3" value="@nota.CodSnf" style="width: 70px;" />
+                        @nota.CodSnf
                     </td>
                     <td>@nota.CodFor - @nota.Fornecedor?.NomFor</td>
                     <td>
-                        <input type="date" class="form-control form-control-sm campo-editavel"
+                        <input type="date" required class="form-control form-control-sm campo-editavel"
                                data-campo="DatEmi" value="@nota.DatEmi.ToString("yyyy-MM-dd")" />
                     </td>
                     <td>
-                        <input type="date" class="form-control form-control-sm campo-editavel"
+                        <input type="date" required class="form-control form-control-sm campo-editavel"
                                data-campo="DatEnt" value="@nota.DatEnt.ToString("yyyy-MM-dd")" />
                     </td>
                     <td>
-                        <input type="text" class="form-control form-control-sm campo-editavel"
+                        <input type="text" required class="form-control form-control-sm campo-editavel"
                                data-campo="TnsPro" list="listaTns" maxlength="5"
                                value="@nota.TnsPro" style="width: 90px;" />
                     </td>
                     <td>
-                        <input type="text" class="form-control form-control-sm campo-editavel"
-                               data-campo="SitNfc" value="@nota.SitNfc" style="width: 70px;" />
+                        @nota.SitNfc
                     </td>
                     <td>
-                        <input type="text" inputmode="decimal" class="form-control form-control-sm text-end campo-editavel"
-                               data-campo="VlrLiq"
-                               value="@nota.VlrLiq.ToString("N2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))"
-                               style="width: 120px;" />
+                        @nota.VlrLiq.ToString("N2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))
                     </td>
                     <td class="text-center text-nowrap">
                         @* Checkbox: apenas visual, sem comportamento *@
@@ -156,7 +153,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="modalItensTitulo">Nota</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar e manter alterações"></button>
             </div>
             <div class="modal-body">
                 <div id="modalItensErro" class="alert alert-danger d-none"></div>
@@ -173,15 +170,15 @@
                             <th>Vlr. Bruto</th>
                             <th>Transação</th>
                             <th>Motivo</th>
-                            <th>Base ICMS ST</th>
                             <th>Base ICMS</th>
+                            <th>Base ICMS ST</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
                 </table>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-secondary btn-sm" id="btnCancelarItens">Cancelar</button>
                 <button type="button" class="btn btn-success btn-sm" id="btnOkItens">Salvar</button>
             </div>
         </div>
@@ -189,7 +186,7 @@
 </div>
 
 <style>
-    .campo-alterado {
+    .campo-alterado, .campo-alterado:focus {
         background-color: #fff3cd;
         border-color: #ffc107;
     }
@@ -202,18 +199,17 @@
             const URL_PRODUTO = '@Url.Action("BuscarProduto", "NotasEntradas")';
             const modalEl = document.getElementById('modalItens');
             const tbodyItens = document.querySelector('#tabelaItens tbody');
-            const notasAlteradas = [];
+            const btnSalvarItens = document.getElementById('btnOkItens');
 
             const estado = {};   // chave da nota -> { original: [...], atual: [...] }
             let chaveAberta = null, botaoAberto = null, trabalho = [];
+            let consultaItens = null;
+            let cancelarItens = false;
 
 
             const camposItem = [
                 { k: 'codPro',     tipo: 'text',   maxlength: 14 },
                 { k: 'qtdRec',     tipo: 'number', step: '0.00001' },
-                { k: 'preUni',     tipo: 'number', step: '0.01' },
-                { k: 'vlrLiq',     tipo: 'number', step: '0.01' },
-                { k: 'vlrBru',     tipo: 'number', step: '0.01' },
                 { k: 'tnsPro',     tipo: 'text',   maxlength: 5 },
                 { k: 'usU_CodMot', tipo: 'text' },   // nome que o JSON devolve para USU_CodMot
                 { k: 'vlrBsi',     tipo: 'number', step: '0.01' },
@@ -222,8 +218,23 @@
 
             const esc = s => String(s ?? '').replace(/[&<>"']/g,
                 c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-            const diferente = (a, b) => (a ?? '') !== (b ?? '');
+            const valorCampo = (valor, campo) => {
+                const texto = String(valor ?? '').trim();
+                return campo.tipo === 'number' && texto !== '' ? Number(texto) : texto;
+            };
+            const diferente = (atual, original, campo) =>
+                valorCampo(atual, campo) !== valorCampo(original, campo);
             const clonar = o => JSON.parse(JSON.stringify(o));
+
+            function coletarItensAlterados(nota) {
+                return nota.atual.flatMap((item, idx) => {
+                    const campos = camposItem.filter(c => diferente(item[c.k], nota.original[idx][c.k], c));
+                    return campos.length ? [{
+                        seqIpc: item.seqIpc,
+                        ...Object.fromEntries(campos.map(c => [c.k, String(item[c.k] ?? '').trim()]))
+                    }] : [];
+                });
+            }
 
             // ---------- Grid principal: destaque das alterações ----------
             function atualizarContador() {
@@ -241,7 +252,7 @@
             document.querySelectorAll('#gridNotas .campo-editavel').forEach(el => {
                 el.dataset.original = el.value;
                 el.addEventListener('input', () => {
-                    el.classList.toggle('campo-alterado', el.value !== el.dataset.original);
+                    el.classList.toggle('campo-alterado', el.value.trim() !== el.dataset.original.trim());
                     marcarLinha(el.closest('tr'));
                 });
             });
@@ -267,20 +278,26 @@
 
             function inputHtml(c, idx, valor, alterado) {
                 const extra = c.tipo === 'number' ? `step="${c.step}"` : (c.maxlength ? `maxlength="${c.maxlength}"` : '');
-                return `<input type="${c.tipo}" ${extra} class="form-control form-control-sm ${alterado ? 'campo-alterado' : ''}"
+                const required = c.k === 'usU_CodMot' ? '' : 'required';
+                return `<input type="${c.tipo}" ${extra} ${required} class="form-control form-control-sm ${alterado ? 'campo-alterado' : ''}"
                                data-idx="${idx}" data-campo="${c.k}" value="${esc(valor)}" />`;
             }
 
             function renderizarItens() {
                 const original = estado[chaveAberta].original;
                 tbodyItens.innerHTML = trabalho.map((it, idx) => {
-                    const alt = k => diferente(it[k], original[idx][k]);
-                    const cel = k => `<td>${inputHtml(camposItem.find(c => c.k === k), idx, it[k], alt(k))}</td>`;
+                    const cel = k => {
+                        const campo = camposItem.find(c => c.k === k);
+                        return `<td>${inputHtml(campo, idx, it[k], diferente(it[k], original[idx][k], campo))}</td>`;
+                    };
+                    const descricao = it.produto?.desPro ?? '';
                     return `<tr>
                         <td>${esc(it.seqIpc)}</td>
                         ${cel('codPro')}
-                        <td><span class="descricao-produto" data-idx="${idx}">${esc(it.produto?.desPro ?? '')}</span></td>
-                        ${cel('qtdRec')}${cel('preUni')}${cel('vlrLiq')}${cel('vlrBru')}${cel('tnsPro')}
+                        <td><span class="descricao-produto ${descricao !== (original[idx].produto?.desPro ?? '') ? 'campo-alterado' : ''}" data-idx="${idx}">${esc(descricao)}</span></td>
+                        ${cel('qtdRec')}
+                        <td>${esc(it.preUni)}</td><td>${esc(it.vlrLiq)}</td><td>${esc(it.vlrBru)}</td>
+                        ${cel('tnsPro')}
                         ${cel('usU_CodMot')}${cel('vlrBsi')}${cel('vlrBic')}
                     </tr>`;
                 }).join('');
@@ -290,10 +307,15 @@
                 const el = e.target;
                 if (!el.dataset.campo) return;
                 const idx = Number(el.dataset.idx), campo = el.dataset.campo;
-                const numerico = camposItem.find(c => c.k === campo).tipo === 'number';
-                trabalho[idx][campo] = numerico ? (el.value === '' ? null : parseFloat(el.value)) : el.value;
+                trabalho[idx][campo] = el.value;
+                const definicao = camposItem.find(c => c.k === campo);
+                const original = estado[chaveAberta].original[idx];
+                if (campo === 'codPro') {
+                    trabalho[idx].produto = diferente(el.value, original.codPro, definicao)
+                        ? null : original.produto;
+                }
                 el.classList.toggle('campo-alterado',
-                    diferente(trabalho[idx][campo], estado[chaveAberta].original[idx][campo]));
+                    diferente(el.value, original[campo], definicao));
             });
 
             // Consulta a descrição do novo código, sem reconstruir o modal.
@@ -318,6 +340,7 @@
             }
 
             label.textContent = 'Buscando...';
+            item.produto = null;
 
             try {
                 const url = `${URL_PRODUTO}?${new URLSearchParams({ codPro: codigo })}`;
@@ -363,6 +386,7 @@
                 if (el.dataset.campo !== 'codPro') return;
                 const idx = Number(el.dataset.idx);
                 const codigo = el.value.trim();
+                el.value = codigo;
                 trabalho[idx].codPro = codigo;
                 await buscarDescricaoProduto(idx, codigo, chaveAberta);
             });
@@ -377,9 +401,14 @@
                 }
 
                 const tr = btn.closest('tr');
-                chaveAberta = chaveDaLinha(tr);
+                const chave = chaveDaLinha(tr);
+                const consulta = new AbortController();
+                consultaItens?.abort();
+                consultaItens = consulta;
+                chaveAberta = chave;
                 consultasProduto.clear();
                 botaoAberto = btn;
+                btnSalvarItens.disabled = true;
 
                 document.getElementById('modalItensTitulo').textContent = `Nota ${tr.dataset.num}`;
                 const erro = document.getElementById('modalItensErro');
@@ -391,22 +420,24 @@
                 bootstrap.Modal.getOrCreateInstance(modalEl).show();
 
                 try {
-                    if (!estado[chaveAberta]) {
+                    if (!estado[chave]) {
                         const qs = new URLSearchParams({
                             numNfc: tr.dataset.num, codEmp: tr.dataset.emp, codFil: tr.dataset.fil,
                             codFor: tr.dataset.for, codSnf: tr.dataset.snf
                         });
-                        // const resp = await fetch(`${URL_ITENS}?${qs}`);
-                        // if (!resp.ok) throw new Error(`Falha ao buscar os itens (HTTP ${resp.status}).`);
-                        const resp = await fetch(`${URL_ITENS}?${qs}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                        const resp = await fetch(`${URL_ITENS}?${qs}`, {
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                            signal: consulta.signal
+                        });
                         if (resp.status === 401) throw new Error('Sua sessão expirou. Entre novamente (alterações não gravadas serão perdidas).');
                         if (!resp.ok) throw new Error(`Falha ao buscar os itens (HTTP ${resp.status}).`);
                         if (!(resp.headers.get('content-type') || '').includes('application/json'))
                             throw new Error('A resposta não é JSON. Confira se a action ListarItensNotas devolve Json/Ok.');
                         const itens = await resp.json();
-                        estado[chaveAberta] = { original: itens, atual: clonar(itens) };
+                        if (consulta.signal.aborted) return;
+                        estado[chave] = { original: itens, atual: clonar(itens) };
                     }
-                    trabalho = clonar(estado[chaveAberta].atual);
+                    trabalho = clonar(estado[chave].atual);
 
                     if (trabalho.length === 0) {
                         erro.textContent = 'Esta nota não possui itens.';
@@ -414,74 +445,149 @@
                     } else {
                         renderizarItens();
                         tabela.classList.remove('d-none');
+                        btnSalvarItens.disabled = false;
+                        trabalho.forEach((item, idx) => {
+                            if (!item.produto && item.codPro.trim() !== estado[chave].original[idx].codPro.trim())
+                                buscarDescricaoProduto(idx, item.codPro, chave);
+                        });
                     }
                 } catch (ex) {
+                    if (consulta.signal.aborted) return;
                     erro.textContent = ex.message;
                     erro.classList.remove('d-none');
                 } finally {
-                    carregando.classList.add('d-none');
+                    if (!consulta.signal.aborted) carregando.classList.add('d-none');
                 }
             });
 
-            document.getElementById('btnOkItens').addEventListener('click', () => {
-                const e = estado[chaveAberta];
-                if (e) {
-                    e.atual = clonar(trabalho);
-                    const mudou = e.atual.some((it, i) => camposItem.some(c => diferente(it[c.k], e.original[i][c.k])));
+            modalEl.addEventListener('hide.bs.modal', evento => {
+                const nota = estado[chaveAberta];
+                if (nota && !cancelarItens && !btnSalvarItens.disabled) {
+                    for (const campo of tbodyItens.querySelectorAll('input.campo-alterado')) {
+                        if (campo.required) campo.value = campo.value.trim();
+                        if (!campo.reportValidity()) {
+                            evento.preventDefault();
+                            return;
+                        }
+                    }
+                    nota.atual = trabalho;
+                    const mudou = coletarItensAlterados(nota).length > 0;
                     botaoAberto.classList.toggle('text-warning', mudou);   // olho amarelo = itens alterados
                     marcarLinha(botaoAberto.closest('tr'));
                 }
+                consultaItens?.abort();
+            });
+
+            btnSalvarItens.addEventListener('click', () => {
                 bootstrap.Modal.getOrCreateInstance(modalEl).hide();
             });
-                document.getElementById("btnProcessar")
-        .addEventListener("click", async function () {
+            document.getElementById('btnCancelarItens').addEventListener('click', () => {
+                cancelarItens = true;
+                bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+                cancelarItens = false;
+            });
 
-            const btn = this;
+            function coletarNotasAlteradas() {
+                const notas = [];
+                for (const tr of document.querySelectorAll('#gridNotas tbody tr[data-emp]')) {
+                    const campos = [...tr.querySelectorAll('.campo-editavel')]
+                        .filter(el => el.value.trim() !== el.dataset.original.trim());
+                    const estadoItens = estado[chaveDaLinha(tr)];
+                    const itens = estadoItens ? coletarItensAlterados(estadoItens) : [];
+                    if (!campos.length && !itens.length) continue;
 
-     
-            const notasAlteradas = [];
+                    const invalido = campos.find(el => !el.reportValidity() || !el.value.trim());
+                    if (invalido) throw new Error(`Preencha corretamente ${invalido.dataset.campo} na nota ${tr.dataset.num}.`);
 
-            
-
-            btn.disabled = true;
-
-            try {
-                const token = document.querySelector(
-                    'input[name="__RequestVerificationToken"]'
-                )?.value;
-
-                const response = await fetch(
-                    '@Url.Action("ProcessarNotas", "NotasEntradas")',
-                    {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "RequestVerificationToken": token ?? ""
-                        },
-                        body: JSON.stringify(notasAlteradas)
-                    }
-                );
-
-                if (!response.ok) {
-                    throw new Error(
-                        `Erro HTTP ${response.status}`
-                    );
+                    const { emp, fil, for: fornecedor, num, snf } = tr.dataset;
+                    notas.push({
+                        codEmp: Number(emp), codFil: Number(fil), codFor: Number(fornecedor),
+                        numNfc: Number(num), codSnf: snf, itens,
+                        ...Object.fromEntries(campos.map(el => [el.dataset.campo, el.value.trim()]))
+                    });
                 }
-
-                const resultado = await response.json();
-
-                console.log("Resultado do processamento:", resultado);
-
-                alert("Requisição enviada ao Controller!");
-
-            } catch (erro) {
-                console.error("Erro ao processar notas:", erro);
-                alert("Erro ao processar: " + erro.message);
-            } finally {
-                btn.disabled = false;
+                return notas;
             }
-        });
-        
+
+            const painel = document.getElementById('resultadoProcessamento');
+            const grid = document.getElementById('gridNotas');
+            const chaveDoResultado = nota =>
+                `${nota.codEmp}-${nota.codFil}-${nota.codFor}-${nota.numNfc}-${nota.codSnf}`;
+
+            document.getElementById('btnProcessar').addEventListener('click', async function () {
+                this.disabled = true;
+                painel.replaceChildren();
+                let envioEmAndamento = false;
+
+                try {
+                    const notas = coletarNotasAlteradas();
+                    if (!notas.length) {
+                        painel.textContent = 'Nenhuma nota alterada para processar.';
+                        return;
+                    }
+
+                    const token = document.querySelector('#tokenProcessamento input').value;
+                    grid.inert = true;
+                    painel.textContent = 'Gravando alterações na Senior...';
+                    envioEmAndamento = true;
+                    const resposta = await fetch('@Url.Action("ProcessarNotas", "NotasEntradas")', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': token,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify(notas)
+                    });
+
+                    if (resposta.status >= 400 && resposta.status < 500) envioEmAndamento = false;
+                    if (resposta.status === 401) throw new Error('Sua sessão expirou.');
+                    if (!resposta.ok) {
+                        const detalhe = (resposta.headers.get('content-type') || '').startsWith('text/plain')
+                            ? await resposta.text() : '';
+                        throw new Error(detalhe || `Falha na requisição (HTTP ${resposta.status}).`);
+                    }
+
+                    const resultados = await resposta.json();
+                    envioEmAndamento = false;
+                    const linhas = new Map([...grid.querySelectorAll('tbody tr[data-emp]')]
+                        .map(tr => [chaveDaLinha(tr), tr]));
+                    painel.replaceChildren();
+                    for (const nota of resultados) {
+                        const identificacao = `Nota ${nota.numNfc}/${nota.codSnf} (empresa ${nota.codEmp}, filial ${nota.codFil}, fornecedor ${nota.codFor})`;
+                        const linhaResultado = document.createElement('div');
+                        if (nota.sucesso) {
+                            linhaResultado.className = 'text-success';
+                            linhaResultado.textContent = `${identificacao} — Gravação confirmada. ${nota.mensagem}`;
+                            const chave = chaveDoResultado(nota);
+                            const tr = linhas.get(chave);
+                            if (tr) {
+                                for (const campo of tr.querySelectorAll('.campo-editavel')) {
+                                    campo.dataset.original = campo.value;
+                                    campo.classList.remove('campo-alterado');
+                                }
+                                delete estado[chave];
+                                tr.querySelector('.btn-ver-itens').classList.remove('text-warning');
+                                marcarLinha(tr);
+                            }
+                        } else if (nota.confirmacaoPendente) {
+                            linhaResultado.className = 'text-warning-emphasis';
+                            linhaResultado.textContent = `${identificacao} — Gravação sem confirmação. ${nota.mensagem} Confira a nota no ERP antes de reenviar.`;
+                        } else {
+                            linhaResultado.className = 'text-danger';
+                            linhaResultado.textContent = `${identificacao} — ${nota.mensagem}`;
+                        }
+                        painel.append(linhaResultado);
+                    }
+                } catch (erro) {
+                    painel.textContent = envioEmAndamento
+                        ? `Lote sem confirmação. ${erro.message} Confira as notas no ERP antes de reenviar.`
+                        : erro.message;
+                } finally {
+                    grid.inert = false;
+                    this.disabled = false;
+                }
+            });
         })();
     </script>
 }

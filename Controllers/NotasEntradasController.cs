@@ -40,9 +40,9 @@ namespace SistemaEntradaNotaFiscal.Controllers {
             return View(result);
         }
 
-        public async Task<IActionResult> ListarItensNotas(int numNfc, short codEmp, int codFil, int codFor, string codSnf) {
+        public async Task<IActionResult> ListarItensNotas(int numNfc, short codEmp, int codFil, int codFor, string codSnf, CancellationToken cancellationToken) {
 
-            var result = await _notasEntradasService.ListarItens(numNfc, codEmp, codFil, codFor, codSnf);
+            var result = await _notasEntradasService.ListarItens(numNfc, codEmp, codFil, codFor, codSnf, cancellationToken);
 
             return Ok(result);
         }
@@ -66,16 +66,27 @@ namespace SistemaEntradaNotaFiscal.Controllers {
         public async Task<IActionResult> ProcessarNotas(
             [FromBody] List<SalvarNotaRequest> notas,
             CancellationToken cancellationToken) {
-                    if (notas == null || notas.Count == 0)
-                        return BadRequest("Nenhuma nota enviada.");
+            if (!ModelState.IsValid)
+                return BadRequest("O lote contém campos com valores ou formatos inválidos.");
 
-                    if (notas.Count > 100)
-                        return BadRequest("O lote excede o limite de 100 notas.");
+            if (notas == null || notas.Count == 0)
+                return BadRequest("Nenhuma nota enviada.");
 
-                    var resultados = await _processamentoNotaService
-                        .ProcessarLoteAsync(notas, cancellationToken);
+            if (notas.Count > 100)
+                return BadRequest("O lote excede o limite de 100 notas.");
 
-                    return Ok(resultados);
-                }
+            if (notas.Any(n => n == null || n.Itens?.Any(i => i == null) == true))
+                return BadRequest("O lote contém notas ou itens inválidos.");
+
+            if (notas.GroupBy(n => (n.CodEmp, n.CodFil, n.CodFor, n.NumNfc, n.CodSnf.Trim().ToUpperInvariant()))
+                .Any(g => g.Count() > 1))
+                return BadRequest("O lote contém notas duplicadas.");
+
+            Response.Headers.CacheControl = "no-store";
+            var resultados = await _processamentoNotaService
+                .ProcessarLoteAsync(notas, cancellationToken);
+
+            return Ok(resultados);
+        }
     }
 }
