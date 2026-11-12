@@ -18,7 +18,7 @@ namespace SistemaEntradaNotaFiscal.Models {
         [Column("TnsPro"), MaxLength(5)] public string TnsPro { get; set; } = string.Empty;
         [Column("TipNfe")] public short TipNfe { get; set; }       
         [Column("VlrLiq")] public decimal VlrLiq { get; set; }
-        [Column("SitNfc")] public string SitNfc { get; set; } = string.Empty; 
+        [Column("SitNfc")] public string SitNfc { get; set; } = string.Empty;
 
         public ICollection<ItemNota> ItemNotas { get; set; } = new List<ItemNota>();
 

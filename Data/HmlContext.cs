@@ -16,6 +16,7 @@ namespace SistemaEntradaNotaFiscal.Data {
             {
                 e.ToTable("E440NFC", t => t.ExcludeFromMigrations());
                 e.HasKey(n => new { n.CodEmp, n.CodFil, n.CodFor, n.NumNfc, n.CodSnf });
+                e.Property(n => n.SitNfc).IsUnicode(false);
             });
 
             modelBuilder.Entity<ItemNota>(e => {

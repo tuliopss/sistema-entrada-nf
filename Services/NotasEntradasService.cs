@@ -16,7 +16,8 @@ namespace SistemaEntradaNotaFiscal.Services {
             
             }
 
-        public async Task<PagedResult<NotasEntrada>> ListarCapasNotas(DateTime? DatEmi, DateTime? DateFim, int? codFor, int page = 1, int pageSize = 20) {
+        public async Task<PagedResult<NotasEntrada>> ListarCapasNotas(
+            DateTime? DatEmi, DateTime? DateFim, int? codFor, string? sitNfc, int? numNfc, int page = 1, int pageSize = 20) {
             //var query = from obj in _context.NotasEntradas select obj;
             var query = _context.NotasEntradas
                 .AsNoTracking()
@@ -32,6 +33,15 @@ namespace SistemaEntradaNotaFiscal.Services {
 
             if (codFor.HasValue) {
                 query = query.Where(x => x.CodFor == codFor.Value);
+            }
+
+            if (numNfc.HasValue) {
+                query = query.Where(x => x.NumNfc == numNfc.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(sitNfc)) {
+                var situacao = sitNfc.Trim();
+                query = query.Where(x => x.SitNfc == situacao);
             }
 
             var total = await query.CountAsync();

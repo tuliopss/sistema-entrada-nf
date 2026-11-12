@@ -1,4 +1,5 @@
 ﻿using SistemaEntradaNotaFiscal.DTOs;
+using SistemaEntradaNotaFiscal.DTO;
 using System.Globalization;
 using System.ServiceModel;
 using WS_NF_HML;
@@ -43,37 +44,12 @@ public class SeniorNotaFiscalService : ISeniorNotaFiscalService {
         }
 
         var parameters = MontarRequisicao(nota, tipCal);
-        var url = _configuration["Senior:Url"]
-            ?? throw new InvalidOperationException("URL Senior não configurada.");
-
-        var usuario = _configuration["Senior:Usuario"]
-            ?? throw new InvalidOperationException("Usuário Senior não configurado.");
-
-        var senha = _configuration["Senior:Senha"]
-            ?? throw new InvalidOperationException("Senha Senior não configurada.");
-
-        var binding = new BasicHttpBinding(BasicHttpSecurityMode.None) {
-            MaxReceivedMessageSize = 20 * 1024 * 1024,
-            SendTimeout = TimeSpan.FromMinutes(3),
-            ReceiveTimeout = TimeSpan.FromMinutes(3),
-            OpenTimeout = TimeSpan.FromSeconds(30)
-        };
-
-        var endpoint = new EndpointAddress(url);
-        Console.WriteLine("CREDENCIAIS:" + usuario + " " + senha);
-        var client =
-            new sapiens_Synccom_senior_g5_co_mcm_cpr_notafiscalClient(
-                binding, endpoint);
+        var (client, usuario, senha) = CriarCliente();
 
         try {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var resposta = await client.GravarNotasFiscaisEntradaAsync(
-                usuario,
-                senha,
-                0,
-                parameters);
-
+            var resposta = await client.GravarNotasFiscaisEntradaAsync(usuario, senha, 0, parameters);
             var mensagens = new[] { resposta?.erroExecucao, resposta?.mensagemRetorno }
                 .Concat(resposta?.retornosNotasEntrada?.Select(r => r?.retorno) ?? [])
                 .Where(m => !string.IsNullOrWhiteSpace(m))
@@ -90,17 +66,100 @@ public class SeniorNotaFiscalService : ISeniorNotaFiscalService {
             resultado.Mensagem = "A comunicação com a Senior foi interrompida.";
         }
         finally {
-            try {
-                if (client.State == CommunicationState.Faulted)
-                    client.Abort();
-                else
-                    await client.CloseAsync();
-            }
-            catch {
-                client.Abort();
-            }
+            await FecharClienteAsync(client);
         }
         return resultado;
+    }
+
+    public async Task<List<ResultadoProcessamentoDto>> ReabilitarNotasAsync(
+        IReadOnlyList<ReabilitarNotaRequest> notas, CancellationToken cancellationToken) {
+        var parametros = new notafiscalReabilitaCancelaNotaIn {
+            notaFiscal = notas.Select(nota => new notafiscalReabilitaCancelaNotaInNotaFiscal {
+                codEmp = nota.CodEmp,
+                codEmpSpecified = true,
+                codFil = nota.CodFil,
+                codFilSpecified = true,
+                codFor = nota.CodFor,
+                codForSpecified = true,
+                numNfc = nota.NumNfc,
+                numNfcSpecified = true,
+                codSnf = nota.CodSnf.Trim(),
+                tipoOperacao = "R"
+            }).ToArray()
+        };
+        var resultados = notas.Select(nota => new ResultadoProcessamentoDto {
+            CodEmp = nota.CodEmp, CodFil = nota.CodFil, CodFor = nota.CodFor,
+            NumNfc = nota.NumNfc, CodSnf = nota.CodSnf
+        }).ToList();
+
+        var (client, usuario, senha) = CriarCliente();
+        try {
+            cancellationToken.ThrowIfCancellationRequested();
+            var resposta = await client.ReabilitaCancelaNotaAsync(usuario, senha, 0, parametros);
+
+            foreach (var resultado in resultados) {
+                var retornos = resposta?.retorno?.Where(r => r != null &&
+                    int.TryParse(r.codEmp, out var empresa) && empresa == resultado.CodEmp &&
+                    int.TryParse(r.codFil, out var filial) && filial == resultado.CodFil &&
+                    int.TryParse(r.codFor, out var fornecedor) && fornecedor == resultado.CodFor &&
+                    int.TryParse(r.numNfc, out var numero) && numero == resultado.NumNfc &&
+                    string.Equals(r.codSnf?.Trim(), resultado.CodSnf.Trim(), StringComparison.OrdinalIgnoreCase))
+                    .Take(2).ToArray() ?? [];
+                var retorno = retornos.Length == 1 ? retornos[0] : null;
+                var codigo = retorno?.tipoRetorno?.Trim();
+                resultado.Sucesso = codigo == "0" && string.IsNullOrWhiteSpace(resposta?.erroExecucao);
+                resultado.ConfirmacaoPendente = !resultado.Sucesso && codigo != "-1";
+                resultado.Mensagem = string.Join(" | ",
+                    new[] { retorno?.msgRet, resposta?.erroExecucao, resposta?.mensagemRetorno }
+                        .Where(m => !string.IsNullOrWhiteSpace(m)).Distinct()
+                        .DefaultIfEmpty(resultado.Sucesso ? "Nota reabilitada." : "A Senior não confirmou a reabilitação."));
+            }
+        }
+        catch (Exception ex) when (ex is CommunicationException or TimeoutException) {
+            client.Abort();
+            _logger.LogWarning(ex, "Lote de reabilitação sem retorno conclusivo da Senior");
+            foreach (var resultado in resultados) {
+                resultado.ConfirmacaoPendente = true;
+                resultado.Mensagem = "A comunicação com a Senior foi interrompida.";
+            }
+        }
+        finally {
+            await FecharClienteAsync(client);
+        }
+        return resultados;
+    }
+
+    private (sapiens_Synccom_senior_g5_co_mcm_cpr_notafiscalClient Client, string Usuario, string Senha) CriarCliente() {
+        var url = _configuration["Senior:Url"]
+            ?? throw new InvalidOperationException("URL Senior não configurada.");
+
+        var usuario = _configuration["Senior:Usuario"]
+            ?? throw new InvalidOperationException("Usuário Senior não configurado.");
+
+        var senha = _configuration["Senior:Senha"]
+            ?? throw new InvalidOperationException("Senha Senior não configurada.");
+
+        var binding = new BasicHttpBinding(BasicHttpSecurityMode.None) {
+            MaxReceivedMessageSize = 20 * 1024 * 1024,
+            SendTimeout = TimeSpan.FromMinutes(3),
+            ReceiveTimeout = TimeSpan.FromMinutes(3),
+            OpenTimeout = TimeSpan.FromSeconds(30)
+        };
+
+        return (new sapiens_Synccom_senior_g5_co_mcm_cpr_notafiscalClient(binding, new EndpointAddress(url)),
+            usuario, senha);
+    }
+
+    private static async Task FecharClienteAsync(sapiens_Synccom_senior_g5_co_mcm_cpr_notafiscalClient client) {
+        try {
+            if (client.State == CommunicationState.Faulted)
+                client.Abort();
+            else
+                await client.CloseAsync();
+        }
+        catch {
+            client.Abort();
+        }
     }
 
     private static notafiscalGravarNotasFiscaisEntradaIn

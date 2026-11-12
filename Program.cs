@@ -23,6 +23,7 @@ builder.Services.AddScoped<NotasEntradasService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<ProdutoService>();
 builder.Services.AddScoped<ProcessamentoNotaService>();
+builder.Services.AddScoped<ReabilitacaoNotaService>();
 builder.Services.AddScoped<ISeniorNotaFiscalService, SeniorNotaFiscalService>();
 
 
@@ -35,7 +36,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         o.Cookie.HttpOnly = true;
         o.Cookie.SameSite = SameSiteMode.Lax;
         o.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;  // troque por Always quando houver HTTPS
-        o.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+        o.ExpireTimeSpan = TimeSpan.FromMinutes(120);
         o.SlidingExpiration = true;
 
         // Chamadas AJAX (o popup de itens) recebem 401 em vez de um redirecionamento para a tela de login

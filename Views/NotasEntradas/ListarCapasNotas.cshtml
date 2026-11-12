@@ -5,7 +5,9 @@
         page = p,
         codFor = ViewData["codFor"],
         minDate = ViewData["minDate"],
-        maxDate = ViewData["maxDate"]
+        maxDate = ViewData["maxDate"],
+        sitNfc = ViewData["sitNfc"],
+        numNfc = ViewData["numNfc"]
     })!;
     var primeiro = Model.TotalCount == 0 ? 0 : (Model.Page - 1) * Model.PageSize + 1;
     var ultimo = primeiro == 0 ? 0 : primeiro + Model.Items.Count - 1;
@@ -16,9 +18,19 @@
 
 <form method="get" asp-action="ListarCapasNotas" class="row g-2 align-items-end mb-3">
     <div class="col-auto">
+        <label for="numNfc" class="form-label mb-0">Nota Fiscal</label>
+        <input type="text" id="numNfc" name="numNfc" class="form-control form-control-sm"
+               value="@ViewData["numNfc"]" />
+    </div>
+    <div class="col-auto">
         <label for="codFor" class="form-label mb-0">Fornecedor</label>
         <input type="text" id="codFor" name="codFor" class="form-control form-control-sm"
                value="@ViewData["codFor"]" />
+    </div>
+    <div class="col-auto">
+        <label for="codFor" class="form-label mb-0">Situação</label>
+        <input type="text" id="sitNfc" name="sitNfc" class="form-control form-control-sm"
+               value="@ViewData["sitNfc"]" />
     </div>
     <div class="col-auto">
         <label for="minDate" class="form-label mb-0">Emissão de</label>
@@ -38,7 +50,7 @@
         <button type="button" class="btn btn-success btn-sm" id="btnProcessar">Processar</button>
     </div>
     <div class="col-auto">
-        <button type="button" class="btn btn-warning btn-sm">Reabilitar</button>
+        <button type="button" class="btn btn-warning btn-sm" id="btnReabilitar">Reabilitar</button>
     </div>
 </form>
 
@@ -72,7 +84,8 @@
                 <th class="text-end">Valor Líquido</th>
                 <th class="text-center" style="width: 90px;">
                     Ações
-                    <input type="checkbox" class="form-check-input ms-1" title="Marcar todas" />
+                    <input type="checkbox" class="form-check-input ms-1" id="selecionarTodasReabilitacao"
+                           aria-label="Selecionar todas as notas fechadas desta página" />
                 </th>
             </tr>
         </thead>
@@ -102,15 +115,16 @@
                                data-campo="TnsPro" list="listaTns" maxlength="5"
                                value="@nota.TnsPro" style="width: 90px;" />
                     </td>
-                    <td>
+                    <td class="situacao-nota">
                         @nota.SitNfc
                     </td>
                     <td>
                         @nota.VlrLiq.ToString("N2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))
                     </td>
                     <td class="text-center text-nowrap">
-                        @* Checkbox: apenas visual, sem comportamento *@
-                        <input type="checkbox" class="form-check-input me-2" />
+                        <input type="checkbox" class="form-check-input me-2 selecionar-reabilitacao"
+                               aria-label="Selecionar nota @nota.NumNfc para reabilitação"
+                               disabled="@(nota.SitNfc.Trim() != "2")" />
                         <button type="button" class="btn btn-link btn-sm p-0 btn-ver-itens" title="Ver itens da nota">
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
                                 <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z" />
@@ -511,10 +525,103 @@
 
             const painel = document.getElementById('resultadoProcessamento');
             const grid = document.getElementById('gridNotas');
+            const btnProcessar = document.getElementById('btnProcessar');
+            const btnReabilitar = document.getElementById('btnReabilitar');
             const chaveDoResultado = nota =>
                 `${nota.codEmp}-${nota.codFil}-${nota.codFor}-${nota.numNfc}-${nota.codSnf}`;
 
-            document.getElementById('btnProcessar').addEventListener('click', async function () {
+            const selecionarTodas = document.getElementById('selecionarTodasReabilitacao');
+            const selecoesDisponiveis = () => [...grid.querySelectorAll('.selecionar-reabilitacao:enabled')];
+            function atualizarSelecao() {
+                const caixas = selecoesDisponiveis();
+                const marcadas = caixas.filter(caixa => caixa.checked).length;
+                selecionarTodas.disabled = caixas.length === 0;
+                selecionarTodas.checked = marcadas > 0 && marcadas === caixas.length;
+                selecionarTodas.indeterminate = marcadas > 0 && marcadas < caixas.length;
+            }
+
+            selecionarTodas.addEventListener('change', () => {
+                selecoesDisponiveis().forEach(caixa => caixa.checked = selecionarTodas.checked);
+                atualizarSelecao();
+            });
+            grid.addEventListener('change', evento => {
+                if (evento.target.matches('.selecionar-reabilitacao')) atualizarSelecao();
+            });
+            atualizarSelecao();
+
+            btnReabilitar.addEventListener('click', async () => {
+                const linhas = new Map();
+                const notas = selecoesDisponiveis().filter(caixa => caixa.checked).map(caixa => {
+                    const linha = caixa.closest('tr');
+                    const { emp, fil, for: fornecedor, num, snf } = linha.dataset;
+                    linhas.set(chaveDaLinha(linha), { linha, caixa });
+                    return { codEmp: Number(emp), codFil: Number(fil), codFor: Number(fornecedor),
+                        numNfc: Number(num), codSnf: snf };
+                });
+                if (!notas.length) {
+                    painel.textContent = 'Selecione ao menos uma nota fechada.';
+                    return;
+                }
+
+                grid.inert = true;
+                btnProcessar.disabled = btnReabilitar.disabled = true;
+                painel.textContent = 'Reabilitando notas na Senior...';
+
+                try {
+                    const resposta = await fetch('@Url.Action("ReabilitarNotas", "NotasEntradas")', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': document.querySelector('#tokenProcessamento input').value,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify(notas)
+                    });
+
+                    if (resposta.status === 401) {
+                        painel.textContent = 'Sua sessão expirou.';
+                        return;
+                    }
+                    if (!resposta.ok && resposta.status < 500) {
+                        const detalhe = (resposta.headers.get('content-type') || '').startsWith('text/plain')
+                            ? await resposta.text() : '';
+                        painel.textContent = detalhe || `Falha na requisição (HTTP ${resposta.status}).`;
+                        return;
+                    }
+                    if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
+
+                    const resultados = await resposta.json();
+                    painel.replaceChildren();
+                    for (const nota of resultados) {
+                        const mensagem = document.createElement('div');
+                        mensagem.className = nota.sucesso ? 'text-success' :
+                            nota.confirmacaoPendente ? 'text-warning-emphasis' : 'text-danger';
+                        const identificacao = `Nota ${nota.numNfc}/${nota.codSnf} (empresa ${nota.codEmp}, filial ${nota.codFil}, fornecedor ${nota.codFor})`;
+                        mensagem.textContent = `${identificacao} — ${nota.mensagem}`;
+                        if (nota.confirmacaoPendente)
+                            mensagem.textContent += ' Confira a situação no ERP antes de reenviar.';
+                        painel.append(mensagem);
+
+                        if (nota.sucesso) {
+                            const chave = chaveDoResultado(nota);
+                            const { linha, caixa } = linhas.get(chave);
+                            linha.querySelector('.situacao-nota').textContent = '1';
+                            caixa.checked = false;
+                            caixa.disabled = true;
+                            if (!linha.querySelector('.btn-ver-itens').classList.contains('text-warning'))
+                                delete estado[chave];
+                        }
+                    }
+                    atualizarSelecao();
+                } catch (erro) {
+                    painel.textContent = `Lote sem confirmação. ${erro.message} Confira as notas no ERP antes de reenviar.`;
+                } finally {
+                    grid.inert = false;
+                    btnProcessar.disabled = btnReabilitar.disabled = false;
+                }
+            });
+
+            btnProcessar.addEventListener('click', async function () {
                 this.disabled = true;
                 painel.replaceChildren();
                 let envioEmAndamento = false;
@@ -527,6 +634,7 @@
                     }
 
                     const token = document.querySelector('#tokenProcessamento input').value;
+                    btnReabilitar.disabled = true;
                     grid.inert = true;
                     painel.textContent = 'Gravando alterações na Senior...';
                     envioEmAndamento = true;
@@ -585,6 +693,7 @@
                         : erro.message;
                 } finally {
                     grid.inert = false;
+                    btnReabilitar.disabled = false;
                     this.disabled = false;
                 }
             });

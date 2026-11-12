@@ -68,6 +68,7 @@ public class ProcessamentoNotaService {
             throw new ArgumentException("Chave da nota inválida.");
 
         var alteracoes = request.Itens ?? new();
+
         if (request.DatEnt == null && request.DatEmi == null && request.TnsPro == null && alteracoes.Count == 0)
             throw new ArgumentException("Nenhuma alteração informada.");
 
