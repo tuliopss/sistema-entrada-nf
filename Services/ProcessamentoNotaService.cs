@@ -2,6 +2,7 @@
 using SistemaEntradaNotaFiscal.Data;
 using SistemaEntradaNotaFiscal.DTO;
 using SistemaEntradaNotaFiscal.DTOs;
+using SistemaEntradaNotaFiscal.Models;
 
 namespace SistemaEntradaNotaFiscal.Services;
 
@@ -10,16 +11,19 @@ public class ProcessamentoNotaService {
     private readonly NotasEntradasService _notasEntradasService;
     private readonly ISeniorNotaFiscalService _senior;
     private readonly ILogger<ProcessamentoNotaService> _logger;
+    private readonly NotaVendaService _notaVendaService;
 
     public ProcessamentoNotaService(
         HmlContext context,
         NotasEntradasService notasEntradasService,
         ISeniorNotaFiscalService senior,
-        ILogger<ProcessamentoNotaService> logger) {
+        ILogger<ProcessamentoNotaService> logger,
+        NotaVendaService notaVendaService) {
         _context = context;
         _notasEntradasService = notasEntradasService;
         _senior = senior;
         _logger = logger;
+        _notaVendaService = notaVendaService;
     }
 
     public async Task<List<ResultadoProcessamentoDto>> ProcessarLoteAsync(
@@ -42,6 +46,8 @@ public class ProcessamentoNotaService {
                 resultado = await _senior.GravarNotaAsync(nota, ct);
                 if (resultado.Sucesso)
                     await ConferirParcelasAsync(nota, resultado, ct);
+                if (resultado.Sucesso && request.Itens?.Any(i => i.VendasSugeridas != null) == true)
+                    await ConferirReferenciasAsync(nota, request.Itens, resultado, ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) {
                 throw;
@@ -69,11 +75,15 @@ public class ProcessamentoNotaService {
 
         var alteracoes = request.Itens ?? new();
 
-        if (request.DatEnt == null && request.DatEmi == null && request.TnsPro == null && alteracoes.Count == 0)
+        if (request.DatEnt == null && request.DatEmi == null && request.TnsPro == null && request.CodTra == null && alteracoes.Count == 0)
             throw new ArgumentException("Nenhuma alteração informada.");
 
         if (request.TnsPro != null && (string.IsNullOrWhiteSpace(request.TnsPro) || request.TnsPro.Length > 5))
             throw new ArgumentException("Transação da capa inválida.");
+
+        if (request.CodTra.HasValue && (request.CodTra <= 0 ||
+            !await _context.Set<Transportadora>().AsNoTracking().AnyAsync(t => t.CodTra == request.CodTra.Value, ct)))
+            throw new ArgumentException("Código de transportadora inválido ou não cadastrado.");
 
         var capa = await _context.NotasEntradas
             .AsNoTracking()
@@ -114,11 +124,18 @@ public class ProcessamentoNotaService {
 
             DatEnt = request.DatEnt ?? capa.DatEnt,
             DatEmi = request.DatEmi ?? capa.DatEmi,
+            ChvNel = capa.ChvNel,
             TnsPro = request.TnsPro ?? capa.TnsPro,
+            CodTra = request.CodTra ?? capa.CodTra,
             Parcelas = parcelas,
 
             Produtos = itens.Select(item => new ProdutoNotaDto {
                 SeqIpc = item.SeqIpc,
+                EmpNfv = item.EmpNfv,
+                FilNfv = item.FilNfv,
+                SnfNfv = item.SnfNfv,
+                NumNfv = item.NumNfv,
+                SeqIpv = item.SeqIpv,
 
                 CodPro = item.CodPro,
                 CodDer = item.CodDer,
@@ -143,6 +160,9 @@ public class ProcessamentoNotaService {
 
         var produtosPorSequencia = nota.Produtos.ToDictionary(i => i.SeqIpc);
         foreach (var alteracao in alteracoes) {
+            if (alteracao.VendasSugeridas != null &&
+                (alteracao.VendasSugeridas.Count != 1 || alteracao.VendasSugeridas.Any(v => v == null)))
+                throw new ArgumentException($"Item {alteracao.SeqIpc}: a gravação de referências exige uma única venda que atenda toda a quantidade. O rateio entre várias vendas ainda não está disponível.");
             if (!produtosPorSequencia.TryGetValue(alteracao.SeqIpc, out var item))
                 throw new ArgumentException(
                     $"Item {alteracao.SeqIpc} não encontrado na nota.");
@@ -176,7 +196,89 @@ public class ProcessamentoNotaService {
                 item.USU_CodMot = alteracao.USU_CodMot;
         }
 
+        var referencias = alteracoes.Where(a => a.VendasSugeridas != null).ToList();
+        if (referencias.Count > 0) {
+            if (itens.Any(i => i.NumNfv.GetValueOrDefault() > 0))
+                throw new ArgumentException("As sugestões só podem ser aplicadas a uma nota sem vendas referenciadas.");
+
+            // Revalida no servidor com os produtos e quantidades efetivamente enviados.
+            foreach (var original in itens) {
+                var atualizado = produtosPorSequencia[original.SeqIpc];
+                original.CodPro = atualizado.CodPro;
+                original.QtdRec = atualizado.QtdRec;
+            }
+            var vendas = await _notaVendaService.VendasUltimos6mesesCliente(new ChaveNotaRequest {
+                CodEmp = capa.CodEmp, CodFil = capa.CodFil, CodFor = capa.CodFor,
+                NumNfc = capa.NumNfc, CodSnf = capa.CodSnf
+            }, ct, nota.DatEmi) ?? [];
+            var sugestoes = NotaVendaService.MontarSugestaoDeDevolucao(capa.CodEmp, itens, vendas).Sugestoes;
+            foreach (var alteracao in referencias) {
+                var sugestao = sugestoes.SingleOrDefault(s => s.SeqIpc == alteracao.SeqIpc);
+                if (sugestao == null || sugestao.QuantidadeFaltante > 0 ||
+                    !sugestao.Vendas.SequenceEqual(alteracao.VendasSugeridas!))
+                    throw new ArgumentException($"Item {alteracao.SeqIpc}: a sugestão mudou ou não tem saldo suficiente. Consulte as sugestões novamente.");
+                var origem = alteracao.VendasSugeridas![0];
+                var produto = produtosPorSequencia[alteracao.SeqIpc];
+                produto.EmpNfv = origem.CodEmp;
+                produto.FilNfv = origem.CodFil;
+                produto.SnfNfv = origem.CodSnf;
+                produto.NumNfv = origem.NumNfv;
+                produto.SeqIpv = origem.SeqIpv;
+            }
+        }
+
+        await CompletarDerivacoesAsync(nota, ct);
         return nota;
+    }
+
+    private async Task CompletarDerivacoesAsync(NotaCompletaDto nota, CancellationToken ct) {
+        var porProduto = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var produto in nota.Produtos.Where(p => string.IsNullOrWhiteSpace(p.CodDer))) {
+            var codigo = produto.CodPro.Trim();
+            if (!porProduto.TryGetValue(codigo, out var derivacao)) {
+                // Somente leitura: a persistência continua exclusivamente no Web Service.
+                var cadastradas = await _context.Database.SqlQuery<string>($"""
+                    SELECT CodDer AS Value FROM E075DER
+                    WHERE CodEmp = {nota.CodEmp} AND CodPro = {codigo}
+                    """).ToListAsync(ct);
+                var validas = cadastradas.Select(d => d.Trim())
+                    .Where(d => d.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                if (validas.Count > 1)
+                    throw new ArgumentException($"Item {produto.SeqIpc}: o produto {codigo} está sem derivação na entrada e possui várias derivações cadastradas ({string.Join(", ", validas)}). Informe a derivação correta antes de processar.");
+                derivacao = validas.SingleOrDefault();
+                porProduto[codigo] = derivacao;
+            }
+            produto.CodDer = derivacao;
+        }
+    }
+
+    private async Task ConferirReferenciasAsync(
+        NotaCompletaDto nota, List<ItemAlteradoDto> alteracoes,
+        ResultadoProcessamentoDto resultado, CancellationToken ct) {
+        try {
+            var sequencias = alteracoes.Where(a => a.VendasSugeridas != null).Select(a => a.SeqIpc).ToList();
+            var gravados = await _context.ItemNota.AsNoTracking()
+                .Where(i => i.CodEmp == nota.CodEmp && i.CodFil == nota.CodFil &&
+                    i.CodFor == nota.CodFor && i.NumNfc == nota.NumNfc && i.CodSnf == nota.CodSnf &&
+                    sequencias.Contains(i.SeqIpc))
+                .Select(i => new { i.SeqIpc, i.EmpNfv, i.FilNfv, i.SnfNfv, i.NumNfv, i.SeqIpv })
+                .ToListAsync(ct);
+            var esperados = nota.Produtos.Where(p => sequencias.Contains(p.SeqIpc)).ToList();
+            if (gravados.Count == esperados.Count && esperados.All(p => gravados.Any(i =>
+                i.SeqIpc == p.SeqIpc && i.EmpNfv == p.EmpNfv && i.FilNfv == p.FilNfv &&
+                i.NumNfv == p.NumNfv && i.SeqIpv == p.SeqIpv && i.SnfNfv?.Trim() == p.SnfNfv?.Trim())))
+                return;
+            resultado.Mensagem = "A Senior retornou sucesso, mas o vínculo de venda não foi confirmado nos itens da nota.";
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) {
+            throw;
+        }
+        catch (Exception ex) {
+            _logger.LogWarning(ex, "Falha ao conferir referências da nota {NumNfc}", nota.NumNfc);
+            resultado.Mensagem = "A Senior retornou sucesso, mas a conferência das referências de venda falhou.";
+        }
+        resultado.Sucesso = false;
+        resultado.ConfirmacaoPendente = true;
     }
 
     private async Task ConferirParcelasAsync(

@@ -1,6 +1,11 @@
 ﻿namespace SistemaEntradaNotaFiscal.DTOs;
 public class ProdutoNotaDto {
     public short SeqIpc { get; set; }
+    public short? EmpNfv { get; set; }
+    public int? FilNfv { get; set; }
+    public string? SnfNfv { get; set; }
+    public int? NumNfv { get; set; }
+    public short? SeqIpv { get; set; }
 
     public string CodPro { get; set; } = "";
     public string? CodDer { get; set; }

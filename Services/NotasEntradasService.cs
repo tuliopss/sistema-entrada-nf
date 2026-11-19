@@ -52,6 +52,7 @@ namespace SistemaEntradaNotaFiscal.Services {
             var items = await query
                         .Where(n => n.TipNfe == 2)
                         .Include(f => f.Fornecedor)
+                        .Include(t => t.Transportadora)
                         .OrderByDescending(n => n.DatEmi)
                         .ThenByDescending(v => v.VlrLiq)
                         .Skip((page - 1) * pageSize)
@@ -63,7 +64,7 @@ namespace SistemaEntradaNotaFiscal.Services {
         }
 
 
-        public async Task<List<ItemNota>> ListarItens(
+        public async Task<List<ItemNotaEntrada>> ListarItens(
             int numNfc, short codEmp, int codFil, int codFor, string codSnf,
             CancellationToken ct, bool incluirProduto = true) {
             var itens = _context.ItemNota

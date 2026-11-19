@@ -15,8 +15,8 @@ public class ReabilitacaoNotaService {
     }
 
     public async Task<List<ResultadoProcessamentoDto>> ReabilitarLoteAsync(
-        IReadOnlyList<ReabilitarNotaRequest> notas, CancellationToken ct) {
-        var elegiveis = new List<ReabilitarNotaRequest>();
+        IReadOnlyList<ChaveNotaRequest> notas, CancellationToken ct) {
+        var elegiveis = new List<ChaveNotaRequest>();
         var resultados = new List<ResultadoProcessamentoDto>();
 
         foreach (var nota in notas) {
@@ -39,10 +39,10 @@ public class ReabilitacaoNotaService {
                 CodFil = nota.CodFil,
                 CodFor = nota.CodFor,
                 NumNfc = nota.NumNfc,
-                CodSnf = nota.CodSnf
-                //Mensagem = situacao == null
-                //    ? "Nota de devolução não encontrada."
-                //    : "A reabilitação exige uma nota na situação 2 (Fechada)."
+                CodSnf = nota.CodSnf,
+                Mensagem = situacao == null
+                    ? "Nota de devolução não encontrada."
+                    : "A reabilitação exige uma nota na situação 2 (Fechada)."
             });
         }
 

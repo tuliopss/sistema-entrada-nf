@@ -20,10 +20,14 @@ builder.Configuration["Senior:Senha"] ??= builder.Configuration["SENIOR_SENHA"];
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddScoped<NotasEntradasService>();
+builder.Services.AddScoped<NotaVendaService>();
+
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<ProdutoService>();
+builder.Services.AddScoped<TransportadoraService>();
 builder.Services.AddScoped<ProcessamentoNotaService>();
 builder.Services.AddScoped<ReabilitacaoNotaService>();
+builder.Services.AddScoped<FechamentoNotaService>();
 builder.Services.AddScoped<ISeniorNotaFiscalService, SeniorNotaFiscalService>();
 
 
@@ -65,7 +69,7 @@ app.MapStaticAssets();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}")
+    pattern: "{controller=NotasEntradas}/{action=ListarCapasNotas}/{id?}")
     .WithStaticAssets();
 
 app.Run();

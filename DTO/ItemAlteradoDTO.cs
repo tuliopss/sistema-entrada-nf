@@ -1,6 +1,7 @@
 ﻿namespace SistemaEntradaNotaFiscal.DTO {
         public class ItemAlteradoDto {
             public short SeqIpc { get; set; }      // identifica o item
+            public List<SistemaEntradaNotaFiscal.DTOs.OrigemVendaSugeridaDto>? VendasSugeridas { get; set; }
             public string? CodPro { get; set; }   // null = não alterado, "" = limpar
 
             public decimal? QtdRec { get; set; }

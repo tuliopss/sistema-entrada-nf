@@ -21,6 +21,191 @@ body {
   margin-bottom: 60px;
 }
 
+.navbar .navbar-brand.marca-senf {
+  display: inline-flex;
+  align-items: center;
+  gap: .85rem;
+  max-width: calc(100% - 4rem);
+  white-space: normal;
+  text-align: left;
+  word-break: normal;
+}
+
+.marca-senf-logo {
+  width: 72px;
+  height: 56px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.marca-senf-nome {
+  min-width: 0;
+  font-size: clamp(.9rem, 1.4vw, 1.15rem);
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+body.pagina-login {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  color: #1d2d3e;
+  background: radial-gradient(ellipse at top right, #fdf2f4 0, transparent 48%), #fff;
+}
+
+.login-container {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: clamp(2rem, 6vh, 4rem) 1.5rem;
+}
+
+.login-container main {
+  width: 100%;
+}
+
+.login-painel {
+  width: 100%;
+  max-width: 380px;
+  margin-inline: auto;
+}
+
+.login-identidade {
+  text-align: center;
+  margin-bottom: 1.75rem;
+}
+
+.login-logo {
+  display: block;
+  width: 150px;
+  height: auto;
+  margin: 0 auto 1.75rem;
+}
+
+.login-identidade h1 {
+  margin-bottom: .6rem;
+  font-size: 1.12rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.login-identidade p {
+  margin: 0;
+  color: #64748b;
+  font-size: .9rem;
+}
+
+.login-formulario {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.login-erros.validation-summary-valid {
+  display: none;
+}
+
+.login-erros ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.login-campo {
+  position: relative;
+}
+
+.login-icone {
+  position: absolute;
+  top: 50%;
+  left: 1rem;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.login-campo .login-input {
+  min-height: 56px;
+  padding: .85rem 1rem .85rem 3.2rem;
+  border: 1px solid #a5a5a5;
+  border-radius: 4px;
+  color: #1d2d3e;
+  background-color: #fff;
+}
+
+.login-campo .login-senha {
+  padding-right: 3.5rem;
+}
+
+.login-input::placeholder {
+  color: #718096;
+  opacity: 1;
+}
+
+.login-campo .login-input:focus {
+  border-color: #d30b30;
+  box-shadow: 0 0 0 .2rem rgba(211, 11, 48, .12);
+}
+
+.login-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 48px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #1d2d3e;
+}
+
+.login-toggle:focus-visible {
+  outline: 2px solid #d30b30;
+  outline-offset: -5px;
+}
+
+.login-acessar {
+  width: 100%;
+  min-height: 49px;
+  margin-top: .5rem;
+  border: 1px solid #d20a2e;
+  border-radius: 11px;
+  background: #d20a2e;
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 8px 22px rgba(210, 10, 46, .22);
+  transition: background-color .15s, box-shadow .15s;
+}
+
+.login-acessar:hover,
+.login-acessar:focus-visible,
+.login-acessar:active,
+.login-acessar:disabled {
+  background: #b70727;
+  border-color: #b70727;
+  color: #fff;
+}
+
+.login-assinatura {
+  margin: 1.75rem 0 0;
+  color: #78869b;
+  font-size: .8rem;
+  text-align: center;
+}
+
+@media (max-width: 575.98px) {
+  .navbar .navbar-brand.marca-senf {
+    gap: .6rem;
+    margin-right: .5rem;
+  }
+
+  .marca-senf-logo {
+    width: 56px;
+    height: 44px;
+  }
+}
+
 .form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
   color: var(--bs-secondary-color);
   text-align: end;

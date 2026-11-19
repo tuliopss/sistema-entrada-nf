@@ -13,6 +13,7 @@ namespace SistemaEntradaNotaFiscal.DTO {
         public DateTime? DatEnt { get; set; }
         public DateTime? DatEmi { get; set; }
         public string? TnsPro { get; set; }
+        public int? CodTra { get; set; } // null = não alterado
        
 
         // Só os itens que tiveram alteração

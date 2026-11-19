@@ -1,52 +1,62 @@
-﻿@model SistemaEntradaNotaFiscal.Models.LoginViewModel
+@model SistemaEntradaNotaFiscal.Models.LoginViewModel
 @{
     ViewData["Title"] = "Entrar";
+    ViewData["PaginaLogin"] = true;
 }
 
-<div class="row justify-content-center mt-5">
-    <div class="col-12 col-sm-8 col-md-6 col-lg-4">
-        <div class="card shadow-sm">
-            <div class="card-body p-4">
-                <h4 class="mb-1">Entrada de Notas Fiscais</h4>
-                <p class="text-muted small mb-4">Acesse com o seu usuário e senha do ERP.</p>
-                
-                    <form asp-controller="Auth" asp-action="Auth" asp-route-returnUrl="@ViewData["ReturnUrl"]"  method="post" id="formLogin">
-                    @* Erros gerais (ex.: usuário ou senha inválidos) *@
-                    <div asp-validation-summary="ModelOnly" class="text-danger small mb-3"></div>
-
-                    <div class="mb-3">
-                        <label asp-for="Usuario" class="form-label"></label>
-                        <input asp-for="Usuario" class="form-control" autocomplete="username" autofocus required />
-                        <span asp-validation-for="Usuario" class="text-danger small"></span>
-                    </div>
-
-                    <div class="mb-3">
-                        <label asp-for="Senha" class="form-label"></label>
-                        <div class="input-group">
-                            <input asp-for="Senha" class="form-control" autocomplete="current-password" required />
-                            <button type="button" class="btn btn-outline-secondary d-flex align-items-center" id="btnToggleSenha" tabindex="-1" aria-label="Mostrar senha">
-                                @* Olho aberto: senha oculta (clique para ver) *@
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16" id="btnVerSenha">
-                                    <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z" />
-                                    <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0" />
-                                </svg>
-                                @* Olho cortado: senha visível (clique para ocultar) *@
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="btnOcultarSenha" class="d-none">
-                                    <path d="M2 2L22 22" />
-                                    <path d="M6.71277 6.7226C3.66479 8.79527 2 12 2 12C2 12 5.63636 19 12 19C14.0503 19 15.8174 18.2734 17.2711 17.2884M11 5.05822C11.3254 5.02013 11.6588 5 12 5C18.3636 5 22 12 22 12C22 12 21.3082 13.3317 20 14.8335" />
-                                    <path d="M14 14.2362C13.4692 14.7112 12.7684 15.0001 12 15.0001C10.3431 15.0001 9 13.657 9 12.0001C9 11.1764 9.33193 10.4303 9.86932 9.88818" />
-                                </svg>
-                            </button>
-                        </div>
-                        <span asp-validation-for="Senha" class="text-danger small"></span>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary w-100" id="btnEntrar">Entrar</button>
-                </form>
-            </div>
-        </div>
+<section class="login-painel" aria-labelledby="login-titulo">
+    <div class="login-identidade">
+        <img src="~/images/logo-maranguape.png" asp-append-version="true"
+             class="login-logo" width="172" height="132" alt="Maranguape" />
+        <h1 id="login-titulo">Sistema de Entrada de Notas Fiscais</h1>
+        <p>Acesse com seu usuário e senha do ERP.</p>
     </div>
-</div>
+
+    <form asp-controller="Auth" asp-action="Auth" asp-route-returnUrl="@ViewData["ReturnUrl"]"
+          method="post" id="formLogin" class="login-formulario">
+        <div asp-validation-summary="ModelOnly" class="login-erros text-danger small" role="alert"></div>
+
+        <div class="login-grupo">
+            <label asp-for="Usuario" class="visually-hidden"></label>
+            <div class="login-campo">
+                <svg class="login-icone" xmlns="http://www.w3.org/2000/svg" width="21" height="21" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <circle cx="12" cy="8" r="4" />
+                    <path d="M4 21v-2a8 8 0 0 1 16 0v2" />
+                </svg>
+                <input asp-for="Usuario" class="form-control login-input" placeholder="Usuário do ERP"
+                       autocomplete="username" autocapitalize="none" spellcheck="false" autofocus required
+                       aria-describedby="erro-usuario" />
+            </div>
+            <span asp-validation-for="Usuario" id="erro-usuario" class="text-danger small"></span>
+        </div>
+
+        <div class="login-grupo">
+            <label asp-for="Senha" class="visually-hidden"></label>
+            <div class="login-campo">
+                <svg class="login-icone" xmlns="http://www.w3.org/2000/svg" width="21" height="21" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <rect x="5" y="10" width="14" height="11" rx="2" />
+                    <path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2" />
+                </svg>
+                <input asp-for="Senha" type="password" class="form-control login-input login-senha"
+                       placeholder="Senha" autocomplete="current-password" required aria-describedby="erro-senha" />
+                <button type="button" class="login-toggle" id="btnToggleSenha" aria-label="Mostrar senha"
+                        aria-controls="Senha" aria-pressed="false">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="btnVerSenha" aria-hidden="true">
+                        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+                        <circle cx="12" cy="12" r="3" />
+                    </svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="btnOcultarSenha" class="d-none" aria-hidden="true">
+                        <path d="m3 3 18 18M10.6 5.1A11 11 0 0 1 12 5c6.5 0 10 7 10 7a20 20 0 0 1-3 3.7M6 6.1A21 21 0 0 0 2 12s3.5 7 10 7a12 12 0 0 0 5.2-1.2M10 10a3 3 0 0 0 4 4" />
+                    </svg>
+                </button>
+            </div>
+            <span asp-validation-for="Senha" id="erro-senha" class="text-danger small"></span>
+        </div>
+
+        <button type="submit" class="btn login-acessar" id="btnEntrar">Acessar</button>
+    </form>
+    <p class="login-assinatura">Maranguape Laticínios</p>
+</section>
 
 @section Scripts {
     <script>
@@ -64,6 +74,7 @@
                 iconeVer.classList.toggle('d-none', mostrar);
                 iconeOcultar.classList.toggle('d-none', !mostrar);
                 btnToggle.setAttribute('aria-label', mostrar ? 'Ocultar senha' : 'Mostrar senha');
+                btnToggle.setAttribute('aria-pressed', String(mostrar));
             });
 
             // Evita duplo clique enquanto a requisição está em andamento
@@ -75,7 +86,7 @@
             // Ao voltar pelo botão "voltar" do navegador, libera o botão novamente
             window.addEventListener('pageshow', () => {
                 btnEntrar.disabled = false;
-                btnEntrar.textContent = 'Entrar';
+                btnEntrar.textContent = 'Acessar';
             });
         })();
     </script>

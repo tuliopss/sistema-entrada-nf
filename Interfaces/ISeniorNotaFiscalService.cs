@@ -8,7 +8,10 @@ public interface ISeniorNotaFiscalService {
         CancellationToken cancellationToken);
 
     Task<List<ResultadoProcessamentoDto>> ReabilitarNotasAsync(
-        IReadOnlyList<DTO.ReabilitarNotaRequest> notas, CancellationToken cancellationToken);
+        IReadOnlyList<DTO.ChaveNotaRequest> notas, CancellationToken cancellationToken);
+
+    Task<List<ResultadoProcessamentoDto>> FecharNotasAsync(
+        IReadOnlyList<DTO.ChaveNotaRequest> notas, CancellationToken cancellationToken);
 
     //Task<ResultadoProcessamentoDto?> GravarNotaAsync(
 }

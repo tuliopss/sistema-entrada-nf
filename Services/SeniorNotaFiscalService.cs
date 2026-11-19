@@ -1,5 +1,7 @@
-﻿using SistemaEntradaNotaFiscal.DTOs;
+﻿using Microsoft.EntityFrameworkCore;
 using SistemaEntradaNotaFiscal.DTO;
+using SistemaEntradaNotaFiscal.DTOs;
+using SistemaEntradaNotaFiscal.Models;
 using System.Globalization;
 using System.ServiceModel;
 using WS_NF_HML;
@@ -72,7 +74,7 @@ public class SeniorNotaFiscalService : ISeniorNotaFiscalService {
     }
 
     public async Task<List<ResultadoProcessamentoDto>> ReabilitarNotasAsync(
-        IReadOnlyList<ReabilitarNotaRequest> notas, CancellationToken cancellationToken) {
+        IReadOnlyList<ChaveNotaRequest> notas, CancellationToken cancellationToken) {
         var parametros = new notafiscalReabilitaCancelaNotaIn {
             notaFiscal = notas.Select(nota => new notafiscalReabilitaCancelaNotaInNotaFiscal {
                 codEmp = nota.CodEmp,
@@ -128,6 +130,62 @@ public class SeniorNotaFiscalService : ISeniorNotaFiscalService {
         }
         return resultados;
     }
+
+
+    public async Task<List<ResultadoProcessamentoDto>> FecharNotasAsync(
+        IReadOnlyList<ChaveNotaRequest> notas, CancellationToken cancellationToken) {
+        var parametros = new notafiscalFecharNotaIn {
+            notaFiscal = notas.Select(nota => new notafiscalFecharNotaInNotaFiscal {
+                codEmp = nota.CodEmp,
+                codEmpSpecified = true,
+                codFil = nota.CodFil,
+                codFilSpecified = true,
+                codFor = nota.CodFor,
+                codForSpecified = true,
+                numNfc = nota.NumNfc,
+                numNfcSpecified = true,
+                codSnf = nota.CodSnf.Trim()
+            }).ToArray()
+        };
+        var resultados = notas.Select(nota => new ResultadoProcessamentoDto {
+            CodEmp = nota.CodEmp, CodFil = nota.CodFil, CodFor = nota.CodFor,
+            NumNfc = nota.NumNfc, CodSnf = nota.CodSnf
+        }).ToList();
+
+        var (client, usuario, senha) = CriarCliente();
+        try {
+            cancellationToken.ThrowIfCancellationRequested();
+            var resposta = await client.FecharNotaAsync(usuario, senha, 0, parametros);
+
+            foreach (var resultado in resultados) {
+                var mensagens = resposta?.retorno?.Where(r => r != null &&
+                    int.TryParse(r.codEmp, out var empresa) && empresa == resultado.CodEmp &&
+                    int.TryParse(r.codFil, out var filial) && filial == resultado.CodFil &&
+                    int.TryParse(r.codFor, out var fornecedor) && fornecedor == resultado.CodFor &&
+                    int.TryParse(r.numNfc, out var numero) && numero == resultado.NumNfc &&
+                    string.Equals(r.codSnf?.Trim(), resultado.CodSnf.Trim(), StringComparison.OrdinalIgnoreCase))
+                    .Select(r => r.msgRet) ?? [];
+
+                resultado.Mensagem = string.Join(" | ", mensagens
+                    .Append(resposta?.erroExecucao).Append(resposta?.mensagemRetorno)
+                    .Where(m => !string.IsNullOrWhiteSpace(m)).Distinct());
+            }
+        }
+        catch (Exception ex) when (ex is CommunicationException or TimeoutException) {
+            client.Abort();
+            _logger.LogWarning(ex, "Lote de fechamento sem retorno conclusivo da Senior");
+            foreach (var resultado in resultados) {
+                resultado.ConfirmacaoPendente = true;
+                resultado.Mensagem = "A comunicação com a Senior foi interrompida.";
+            }
+        }
+        finally {
+            await FecharClienteAsync(client);
+        }
+        return resultados;
+    }
+
+    
 
     private (sapiens_Synccom_senior_g5_co_mcm_cpr_notafiscalClient Client, string Usuario, string Senha) CriarCliente() {
         var url = _configuration["Senior:Url"]
@@ -185,7 +243,9 @@ public class SeniorNotaFiscalService : ISeniorNotaFiscalService {
 
                 datEnt = FormatarData(nota.DatEnt),
                 datEmi = FormatarData(nota.DatEmi),
+                chvNel = nota.ChvNel,
                 tnsPro = nota.TnsPro,
+                codTra = nota.CodTra?.ToString(CultureInfo.InvariantCulture),
 
                 // Envia TODOS os produtos da nota
                 produtos = nota.Produtos
@@ -295,8 +355,18 @@ public class SeniorNotaFiscalService : ISeniorNotaFiscalService {
             seqIpc = produto.SeqIpc,
             seqIpcSpecified = true,
 
+            empNfv = produto.EmpNfv,
+            empNfvSpecified = produto.EmpNfv > 0,
+            filNfv = produto.FilNfv,
+            filNfvSpecified = produto.FilNfv > 0,
+            snfNfv = produto.SnfNfv,
+            numNfv = produto.NumNfv > 0 ? produto.NumNfv.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : null,
+            seqIpv = produto.SeqIpv,
+            seqIpvSpecified = produto.SeqIpv > 0,
+
             codPro = produto.CodPro,
-            codDer = produto.CodDer,
+            // Omitir uma derivação ausente; não enviar um elemento vazio ao ERP.
+            codDer = string.IsNullOrWhiteSpace(produto.CodDer) ? null : produto.CodDer.Trim(),
             tnsPro = produto.TnsPro,
 
             qtdRec = FormatarDecimal(produto.QtdRec, 5, nameof(produto.QtdRec)),
@@ -325,4 +395,7 @@ public class SeniorNotaFiscalService : ISeniorNotaFiscalService {
 
         return valor.ToString($"F{casas}", CulturaSenior);
     }
+
+  
+
 }

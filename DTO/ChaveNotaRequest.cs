@@ -1,5 +1,5 @@
 ﻿namespace SistemaEntradaNotaFiscal.DTO {
-    public class ReabilitarNotaRequest {
+    public class ChaveNotaRequest {
         public short CodEmp { get; set; }
         public int CodFil { get; set; }
         public int CodFor { get; set; }

@@ -11,16 +11,19 @@ namespace SistemaEntradaNotaFiscal.Models {
         [Column("CodFor")] 
         public int CodFor { get; set; }
         public Fornecedor Fornecedor { get; set; }
-
         [Column("CodSnf"), MaxLength(3)] public string CodSnf { get; set; } = string.Empty;
         [Column("DatEnt")] public DateTime DatEnt { get; set; }
         [Column("DatEmi")] public DateTime DatEmi { get; set; }
+        [Column("ChvNel")] public string? ChvNel { get; set; }
         [Column("TnsPro"), MaxLength(5)] public string TnsPro { get; set; } = string.Empty;
         [Column("TipNfe")] public short TipNfe { get; set; }       
         [Column("VlrLiq")] public decimal VlrLiq { get; set; }
         [Column("SitNfc")] public string SitNfc { get; set; } = string.Empty;
+        [Column("CodTra")]
+        public int? CodTra { get; set; }
+        public Transportadora? Transportadora { get; set; }
 
-        public ICollection<ItemNota> ItemNotas { get; set; } = new List<ItemNota>();
+        public ICollection<ItemNotaEntrada> ItemNotas { get; set; } = new List<ItemNotaEntrada>();
 
    
     }

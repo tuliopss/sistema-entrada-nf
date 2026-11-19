@@ -1,6 +1,7 @@
 ﻿@model SistemaEntradaNotaFiscal.PagedResult<SistemaEntradaNotaFiscal.Models.NotasEntrada>
 @{
     ViewData["Title"] = "Notas de Entrada";
+    ViewData["LayoutAmplo"] = true;
     string Link(int p) => Url.Action("ListarCapasNotas", new {
         page = p,
         codFor = ViewData["codFor"],
@@ -52,6 +53,9 @@
     <div class="col-auto">
         <button type="button" class="btn btn-warning btn-sm" id="btnReabilitar">Reabilitar</button>
     </div>
+    <div class="col-auto">
+        <button type="button" class="btn btn-secondary btn-sm" id="btnFechar">Fechar nota</button>
+    </div>
 </form>
 
 <div id="tokenProcessamento" hidden>@Html.AntiForgeryToken()</div>
@@ -69,23 +73,25 @@
 
 </div>
 
-<div class="table-responsive">
-    <table class="table table-sm table-hover table-bordered align-middle" id="gridNotas">
+<div class="table-responsive grid-notas-painel">
+    <table class="table table-hover align-middle grid-notas" id="gridNotas">
         <thead class="table-light">
             <tr>
-                <th>Filial</th>
-                <th>Nº Nota</th>
+                <th class="dado-centralizado">Filial</th>
+                <th class="dado-centralizado">Nº Nota</th>
                 <th>Série</th>
                 <th>Fornecedor</th>
-                <th>Emissão</th>
-                <th>Entrada</th>
+                <th class="dado-centralizado">Cód. Transportadora</th>
+                <th>Transportadora</th>
+                <th class="dado-centralizado">Emissão</th>
+                <th class="dado-centralizado">Entrada</th>
                 <th>Transação</th>
-                <th>Situação</th>
-                <th class="text-end">Valor Líquido</th>
+                <th class="dado-centralizado">Situação</th>
+                <th class="dado-centralizado">Valor Líquido</th>
                 <th class="text-center" style="width: 90px;">
                     Ações
                     <input type="checkbox" class="form-check-input ms-1" id="selecionarTodasReabilitacao"
-                           aria-label="Selecionar todas as notas fechadas desta página" />
+                           aria-label="Selecionar todas as notas disponíveis desta página" />
                 </th>
             </tr>
         </thead>
@@ -94,19 +100,26 @@
                 @* A chave original da nota fica no <tr>, onde ninguém edita *@
                 <tr data-emp="@nota.CodEmp" data-fil="@nota.CodFil" data-for="@nota.CodFor"
                     data-num="@nota.NumNfc" data-snf="@nota.CodSnf">
-                    <td>
+                    <td class="dado-centralizado">
                         @nota.CodFil
                     </td>
-                    <td>@nota.NumNfc</td>
+                    <td class="dado-centralizado">@nota.NumNfc</td>
                     <td>
                         @nota.CodSnf
                     </td>
                     <td>@nota.CodFor - @nota.Fornecedor?.NomFor</td>
-                    <td>
+                    <td class="dado-centralizado">
+                        <input type="number" min="1" max="2147483647" step="1" required
+                               aria-label="Código da transportadora da nota @nota.NumNfc"
+                               class="form-control form-control-sm campo-editavel codigo-transportadora"
+                               data-campo="CodTra" value="@(nota.CodTra > 0 ? nota.CodTra.ToString() : "")" />
+                    </td>
+                    <td class="nome-transportadora" data-original="@nota.Transportadora?.NomTra" aria-live="polite">@nota.Transportadora?.NomTra</td>
+                    <td class="dado-centralizado">
                         <input type="date" required class="form-control form-control-sm campo-editavel"
                                data-campo="DatEmi" value="@nota.DatEmi.ToString("yyyy-MM-dd")" />
                     </td>
-                    <td>
+                    <td class="dado-centralizado">
                         <input type="date" required class="form-control form-control-sm campo-editavel"
                                data-campo="DatEnt" value="@nota.DatEnt.ToString("yyyy-MM-dd")" />
                     </td>
@@ -115,16 +128,16 @@
                                data-campo="TnsPro" list="listaTns" maxlength="5"
                                value="@nota.TnsPro" style="width: 90px;" />
                     </td>
-                    <td class="situacao-nota">
+                    <td class="situacao-nota dado-centralizado">
                         @nota.SitNfc
                     </td>
-                    <td>
+                    <td class="dado-centralizado">
                         @nota.VlrLiq.ToString("N2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))
                     </td>
                     <td class="text-center text-nowrap">
                         <input type="checkbox" class="form-check-input me-2 selecionar-reabilitacao"
-                               aria-label="Selecionar nota @nota.NumNfc para reabilitação"
-                               disabled="@(nota.SitNfc.Trim() != "2")" />
+                               aria-label="Selecionar nota @nota.NumNfc"
+                               disabled="@(nota.SitNfc.Trim() is not ("1" or "2"))" />
                         <button type="button" class="btn btn-link btn-sm p-0 btn-ver-itens" title="Ver itens da nota">
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
                                 <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z" />
@@ -136,7 +149,7 @@
             }
             @if (!Model.Items.Any()) {
                 <tr>
-                    <td colspan="10" class="text-center text-muted py-3">Nenhuma nota encontrada para o filtro informado.</td>
+                    <td colspan="12" class="text-center text-muted py-3">Nenhuma nota encontrada para o filtro informado.</td>
                 </tr>
             }
         </tbody>
@@ -172,24 +185,27 @@
             <div class="modal-body">
                 <div id="modalItensErro" class="alert alert-danger d-none"></div>
                 <div id="modalItensCarregando" class="text-muted">Carregando itens...</div>
-                <table class="table table-sm table-bordered align-middle d-none" id="tabelaItens">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Seq.</th>
-                            <th>Cód. Produto</th>
-                            <th>Produto</th>
-                            <th>Qtde</th>
-                            <th>Preço Unitário</th>
-                            <th>Vlr. Líquido</th>
-                            <th>Vlr. Bruto</th>
-                            <th>Transação</th>
-                            <th>Motivo</th>
-                            <th>Base ICMS</th>
-                            <th>Base ICMS ST</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
+                <div class="table-responsive grid-notas-painel d-none" id="painelTabelaItens">
+                    <table class="table table-hover align-middle grid-notas" id="tabelaItens">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="dado-centralizado">Seq.</th>
+                                <th>Cód. Produto</th>
+                                <th>Produto</th>
+                                <th class="dado-centralizado">Qtde</th>
+                                <th class="dado-centralizado">Preço Unitário</th>
+                                <th class="dado-centralizado">Vlr. Líquido</th>
+                                <th class="dado-centralizado">Vlr. Bruto</th>
+                                <th>Transação</th>
+                                <th>Motivo</th>
+                                <th class="dado-centralizado">Base ICMS</th>
+                                <th class="dado-centralizado">Base ICMS ST</th>
+                                <th class="dado-centralizado">Nota de Saída</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary btn-sm" id="btnCancelarItens">Cancelar</button>
@@ -200,9 +216,91 @@
 </div>
 
 <style>
+    .pagina-notas-ampla {
+        max-width: 1560px;
+        padding-inline: clamp(1rem, 2.5vw, 2.5rem);
+    }
+
+    .grid-notas-painel {
+        border: 1px solid #dce4ee;
+        border-radius: .75rem;
+        box-shadow: 0 .2rem .6rem rgba(28, 54, 88, .06);
+    }
+
+    .grid-notas {
+        margin-bottom: 0;
+        text-align: left;
+        --bs-table-hover-bg: #edf5fd;
+    }
+
+    .grid-notas thead th {
+        background-color: #edf2f8;
+        color: #304965;
+        font-size: .875rem;
+        font-weight: 600;
+    }
+
+    .grid-notas .form-control {
+        text-align: left;
+    }
+
+    .grid-notas > :not(caption) > * > * {
+        padding: .625rem .75rem;
+        border-color: #e2e9f1;
+    }
+
+    .grid-notas tbody tr:nth-child(even):not(.table-warning) {
+        --bs-table-bg: #f8fbfe;
+    }
+
+    .grid-notas tbody tr:last-child > td {
+        border-bottom-width: 0;
+    }
+
+    .grid-notas .dado-centralizado,
+    .grid-notas .dado-centralizado .form-control {
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .grid-notas .dado-centralizado {
+        white-space: nowrap;
+    }
+
+    #gridNotas { min-width: 960px; }
+    #gridNotas .codigo-transportadora { min-width: 7rem; }
+    #gridNotas .nome-transportadora { min-width: 13rem; }
+    #tabelaItens { min-width: 1140px; }
+    #tabelaItens td:nth-child(3) { min-width: 14rem; }
+
+    #modalItens .modal-dialog {
+        --bs-modal-width: min(1480px, calc(100vw - 3.5rem));
+    }
+
+    #modalItens .modal-content {
+        border-radius: .875rem;
+    }
+
+    #modalItens .modal-header,
+    #modalItens .modal-footer {
+        background-color: #f8fbfe;
+        border-color: #e2e9f1;
+    }
+
     .campo-alterado, .campo-alterado:focus {
         background-color: #fff3cd;
         border-color: #ffc107;
+    }
+
+    #tabelaItens td.campo-alterado {
+        --bs-table-bg: #fff3cd;
+        --bs-table-accent-bg: #fff3cd;
+        background-color: #fff3cd;
+    }
+
+    #tabelaItens .nota-saida {
+        min-width: 12rem;
+        white-space: normal;
     }
 </style>
 
@@ -211,6 +309,7 @@
         (function () {
             const URL_ITENS = '@Url.Action("ListarItensNotas", "NotasEntradas")';
             const URL_PRODUTO = '@Url.Action("BuscarProduto", "NotasEntradas")';
+            const URL_TRANSPORTADORA = '@Url.Action("BuscarTransportadora", "NotasEntradas")';
             const modalEl = document.getElementById('modalItens');
             const tbodyItens = document.querySelector('#tabelaItens tbody');
             const btnSalvarItens = document.getElementById('btnOkItens');
@@ -243,11 +342,48 @@
             function coletarItensAlterados(nota) {
                 return nota.atual.flatMap((item, idx) => {
                     const campos = camposItem.filter(c => diferente(item[c.k], nota.original[idx][c.k], c));
-                    return campos.length ? [{
+                    const vendas = item.vendasSugeridas;
+                    return campos.length || vendas?.length ? [{
                         seqIpc: item.seqIpc,
-                        ...Object.fromEntries(campos.map(c => [c.k, String(item[c.k] ?? '').trim()]))
+                        ...Object.fromEntries(campos.map(c => [c.k, String(item[c.k] ?? '').trim()])),
+                        ...(vendas?.length ? { vendasSugeridas: clonar(vendas) } : {})
                     }] : [];
                 });
+            }
+
+            async function carregarEstadoItens(tr, signal) {
+                const chave = chaveDaLinha(tr);
+                if (estado[chave]) return estado[chave];
+                const qs = new URLSearchParams({
+                    numNfc: tr.dataset.num, codEmp: tr.dataset.emp, codFil: tr.dataset.fil,
+                    codFor: tr.dataset.for, codSnf: tr.dataset.snf
+                });
+                const resp = await fetch(`${URL_ITENS}?${qs}`, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }, signal
+                });
+                if (resp.status === 401) throw new Error('Sua sessão expirou. Entre novamente (alterações não gravadas serão perdidas).');
+                if (!resp.ok) throw new Error(`Falha ao buscar os itens (HTTP ${resp.status}).`);
+                if (!(resp.headers.get('content-type') || '').includes('application/json'))
+                    throw new Error('A resposta dos itens não é JSON.');
+                const itens = await resp.json();
+                if (signal?.aborted) throw new DOMException('Consulta cancelada.', 'AbortError');
+                return estado[chave] ??= { original: itens, atual: clonar(itens) };
+            }
+
+            async function aplicarSugestoes(nota, tr) {
+                const itens = await carregarEstadoItens(tr);
+                let preenchidas = 0;
+                for (const sugestao of nota.sugestoesVenda) {
+                    if (sugestao.quantidadeFaltante > 0 || !sugestao.vendas?.length) continue;
+                    const item = itens.atual.find(i => i.seqIpc === sugestao.seqIpc);
+                    if (!item || item.numNfv > 0 || item.codPro.trim() !== sugestao.codPro.trim() ||
+                        Number(item.qtdRec) !== Number(sugestao.quantidadeSolicitada)) continue;
+                    item.vendasSugeridas = clonar(sugestao.vendas);
+                    preenchidas++;
+                }
+                tr.querySelector('.btn-ver-itens').classList.toggle('text-warning', coletarItensAlterados(itens).length > 0);
+                marcarLinha(tr);
+                return preenchidas;
             }
 
             // ---------- Grid principal: destaque das alterações ----------
@@ -268,8 +404,51 @@
                 el.addEventListener('input', () => {
                     el.classList.toggle('campo-alterado', el.value.trim() !== el.dataset.original.trim());
                     marcarLinha(el.closest('tr'));
+                    if (el.dataset.campo === 'CodTra') buscarNomeTransportadora(el);
                 });
             });
+
+            const consultasTransportadora = new WeakMap();
+            async function buscarNomeTransportadora(input) {
+                consultasTransportadora.get(input)?.abort();
+                const consulta = new AbortController();
+                consultasTransportadora.set(input, consulta);
+                const linha = input.closest('tr');
+                const nome = linha.querySelector('.nome-transportadora');
+                const codigo = input.value.trim();
+                if (codigo === input.dataset.original.trim()) {
+                    nome.textContent = nome.dataset.original;
+                    nome.classList.remove('campo-alterado');
+                    input.setCustomValidity('');
+                    marcarLinha(linha);
+                    return;
+                }
+                nome.classList.add('campo-alterado');
+                if (!codigo || !Number.isInteger(Number(codigo)) || Number(codigo) <= 0 || Number(codigo) > 2147483647) {
+                    nome.textContent = 'Informe um código válido.';
+                    input.setCustomValidity('Informe um código de transportadora válido.');
+                    marcarLinha(linha);
+                    return;
+                }
+                nome.textContent = 'Buscando...';
+                input.setCustomValidity('Aguarde a consulta da transportadora.');
+                marcarLinha(linha);
+                try {
+                    const resposta = await fetch(`${URL_TRANSPORTADORA}?${new URLSearchParams({ codTra: codigo })}`, {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }, signal: consulta.signal
+                    });
+                    if (!resposta.ok) throw new Error(resposta.status === 404 ? 'Transportadora não encontrada.' :
+                        resposta.status === 401 ? 'Sua sessão expirou.' : `Falha ao consultar transportadora (HTTP ${resposta.status}).`);
+                    const transportadora = await resposta.json();
+                    if (consulta.signal.aborted || input.value.trim() !== codigo) return;
+                    nome.textContent = transportadora.nomTra;
+                    input.setCustomValidity('');
+                } catch (erro) {
+                    if (consulta.signal.aborted || input.value.trim() !== codigo) return;
+                    nome.textContent = erro.message;
+                    input.setCustomValidity(erro.message);
+                }
+            }
 
             function confirmarDescarte() {
             const pendentes = document.querySelectorAll('#gridNotas tbody tr.table-warning').length;
@@ -302,17 +481,31 @@
                 tbodyItens.innerHTML = trabalho.map((it, idx) => {
                     const cel = k => {
                         const campo = camposItem.find(c => c.k === k);
-                        return `<td>${inputHtml(campo, idx, it[k], diferente(it[k], original[idx][k], campo))}</td>`;
+                        const classe = campo.tipo === 'number' ? ' class="dado-centralizado"' : '';
+                        return `<td${classe}>${inputHtml(campo, idx, it[k], diferente(it[k], original[idx][k], campo))}</td>`;
                     };
                     const descricao = it.produto?.desPro ?? '';
+                    const serieVenda = it.snfNfv?.trim();
+                    const notaVenda = it.vendasSugeridas?.length
+                        ? it.vendasSugeridas.map(v => `${v.numNfv}/${v.codSnf} (filial ${v.codFil}, item ${v.seqIpv}: ${v.quantidade})`).join('; ')
+                        : it.numNfv > 0
+                        ? (serieVenda ? `${it.numNfv}` : it.numNfv)
+                        : '—';
                     return `<tr>
-                        <td>${esc(it.seqIpc)}</td>
+                        <td class="dado-centralizado">${esc(it.seqIpc)}</td>
                         ${cel('codPro')}
                         <td><span class="descricao-produto ${descricao !== (original[idx].produto?.desPro ?? '') ? 'campo-alterado' : ''}" data-idx="${idx}">${esc(descricao)}</span></td>
                         ${cel('qtdRec')}
-                        <td>${esc(it.preUni)}</td><td>${esc(it.vlrLiq)}</td><td>${esc(it.vlrBru)}</td>
+                        <td class="dado-centralizado">${esc(it.preUni)}</td>
+                        <td class="dado-centralizado">${esc(it.vlrLiq)}</td>
+                        <td class="dado-centralizado">${esc(it.vlrBru)}</td>
                         ${cel('tnsPro')}
                         ${cel('usU_CodMot')}${cel('vlrBsi')}${cel('vlrBic')}
+                        <td class="dado-centralizado nota-saida ${it.vendasSugeridas?.length ? 'campo-alterado' : ''}">
+                            ${esc(notaVenda)}
+                            ${it.vendasSugeridas?.length ? '<small class="d-block">Sugestão automática — pendente de Processar</small><button type="button" class="btn btn-link btn-sm remover-sugestao" data-idx="' + idx + '">Remover sugestão</button>' : ''}
+                            ${it.vendasSugeridas?.length > 1 ? '<small class="d-block text-danger">Rateio entre vendas: gravação ainda indisponível.</small>' : ''}
+                        </td>
                     </tr>`;
                 }).join('');
             }
@@ -322,6 +515,12 @@
                 if (!el.dataset.campo) return;
                 const idx = Number(el.dataset.idx), campo = el.dataset.campo;
                 trabalho[idx][campo] = el.value;
+                if ((campo === 'codPro' || campo === 'qtdRec') && trabalho[idx].vendasSugeridas) {
+                    delete trabalho[idx].vendasSugeridas;
+                    const celula = el.closest('tr').lastElementChild;
+                    celula.classList.remove('campo-alterado');
+                    celula.textContent = 'Sugestão removida: consulte novamente após processar a alteração.';
+                }
                 const definicao = camposItem.find(c => c.k === campo);
                 const original = estado[chaveAberta].original[idx];
                 if (campo === 'codPro') {
@@ -330,6 +529,13 @@
                 }
                 el.classList.toggle('campo-alterado',
                     diferente(el.value, original[campo], definicao));
+            });
+
+            tbodyItens.addEventListener('click', e => {
+                const botao = e.target.closest('.remover-sugestao');
+                if (!botao) return;
+                delete trabalho[Number(botao.dataset.idx)].vendasSugeridas;
+                renderizarItens();
             });
 
             // Consulta a descrição do novo código, sem reconstruir o modal.
@@ -427,30 +633,15 @@
                 document.getElementById('modalItensTitulo').textContent = `Nota ${tr.dataset.num}`;
                 const erro = document.getElementById('modalItensErro');
                 const carregando = document.getElementById('modalItensCarregando');
-                const tabela = document.getElementById('tabelaItens');
+                const tabela = document.getElementById('painelTabelaItens');
                 erro.classList.add('d-none');
                 tabela.classList.add('d-none');
                 carregando.classList.remove('d-none');
                 bootstrap.Modal.getOrCreateInstance(modalEl).show();
 
                 try {
-                    if (!estado[chave]) {
-                        const qs = new URLSearchParams({
-                            numNfc: tr.dataset.num, codEmp: tr.dataset.emp, codFil: tr.dataset.fil,
-                            codFor: tr.dataset.for, codSnf: tr.dataset.snf
-                        });
-                        const resp = await fetch(`${URL_ITENS}?${qs}`, {
-                            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                            signal: consulta.signal
-                        });
-                        if (resp.status === 401) throw new Error('Sua sessão expirou. Entre novamente (alterações não gravadas serão perdidas).');
-                        if (!resp.ok) throw new Error(`Falha ao buscar os itens (HTTP ${resp.status}).`);
-                        if (!(resp.headers.get('content-type') || '').includes('application/json'))
-                            throw new Error('A resposta não é JSON. Confira se a action ListarItensNotas devolve Json/Ok.');
-                        const itens = await resp.json();
-                        if (consulta.signal.aborted) return;
-                        estado[chave] = { original: itens, atual: clonar(itens) };
-                    }
+                    await carregarEstadoItens(tr, consulta.signal);
+                    if (consulta.signal.aborted) return;
                     trabalho = clonar(estado[chave].atual);
 
                     if (trabalho.length === 0) {
@@ -508,6 +699,8 @@
                         .filter(el => el.value.trim() !== el.dataset.original.trim());
                     const estadoItens = estado[chaveDaLinha(tr)];
                     const itens = estadoItens ? coletarItensAlterados(estadoItens) : [];
+                    if (itens.some(i => i.vendasSugeridas?.length > 1))
+                        throw new Error(`Nota ${tr.dataset.num}: o rateio entre várias vendas está visível no modal, mas a gravação ainda não está disponível.`);
                     if (!campos.length && !itens.length) continue;
 
                     const invalido = campos.find(el => !el.reportValidity() || !el.value.trim());
@@ -517,7 +710,8 @@
                     notas.push({
                         codEmp: Number(emp), codFil: Number(fil), codFor: Number(fornecedor),
                         numNfc: Number(num), codSnf: snf, itens,
-                        ...Object.fromEntries(campos.map(el => [el.dataset.campo, el.value.trim()]))
+                        ...Object.fromEntries(campos.map(el => [el.dataset.campo,
+                            el.dataset.campo === 'CodTra' ? Number(el.value) : el.value.trim()]))
                     });
                 }
                 return notas;
@@ -527,6 +721,7 @@
             const grid = document.getElementById('gridNotas');
             const btnProcessar = document.getElementById('btnProcessar');
             const btnReabilitar = document.getElementById('btnReabilitar');
+            const btnFechar = document.getElementById('btnFechar');
             const chaveDoResultado = nota =>
                 `${nota.codEmp}-${nota.codFil}-${nota.codFor}-${nota.numNfc}-${nota.codSnf}`;
 
@@ -549,26 +744,36 @@
             });
             atualizarSelecao();
 
-            btnReabilitar.addEventListener('click', async () => {
+            async function alterarSituacao(url, situacaoAtual, novaSituacao, mensagemVazia, mensagemEnvio) {
                 const linhas = new Map();
-                const notas = selecoesDisponiveis().filter(caixa => caixa.checked).map(caixa => {
+                for (const caixa of selecoesDisponiveis()) {
+                    if (!caixa.checked) continue;
                     const linha = caixa.closest('tr');
-                    const { emp, fil, for: fornecedor, num, snf } = linha.dataset;
+                    if (linha.querySelector('.situacao-nota').textContent.trim() !== situacaoAtual) continue;
                     linhas.set(chaveDaLinha(linha), { linha, caixa });
+                }
+
+                const notas = [...linhas.values()].map(({ linha }) => {
+                    const { emp, fil, for: fornecedor, num, snf } = linha.dataset;
                     return { codEmp: Number(emp), codFil: Number(fil), codFor: Number(fornecedor),
                         numNfc: Number(num), codSnf: snf };
                 });
                 if (!notas.length) {
-                    painel.textContent = 'Selecione ao menos uma nota fechada.';
+                    painel.textContent = mensagemVazia;
+                    return;
+                }
+
+                if (novaSituacao === '2' && [...linhas.values()].some(({ linha }) => linha.classList.contains('table-warning'))) {
+                    painel.textContent = 'Grave as alterações pendentes das notas selecionadas antes de fechar.';
                     return;
                 }
 
                 grid.inert = true;
-                btnProcessar.disabled = btnReabilitar.disabled = true;
-                painel.textContent = 'Reabilitando notas na Senior...';
+                btnProcessar.disabled = btnReabilitar.disabled = btnFechar.disabled = true;
+                painel.textContent = mensagemEnvio;
 
                 try {
-                    const resposta = await fetch('@Url.Action("ReabilitarNotas", "NotasEntradas")', {
+                    const resposta = await fetch(url, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -602,12 +807,57 @@
                             mensagem.textContent += ' Confira a situação no ERP antes de reenviar.';
                         painel.append(mensagem);
 
+                        if (nota.sugestoesVenda?.length) {
+                            const tr = linhas.get(chaveDoResultado(nota))?.linha;
+                            if (tr) {
+                                try {
+                                    const preenchidas = await aplicarSugestoes(nota, tr);
+                                    if (preenchidas) {
+                                        mensagem.className = 'text-warning-emphasis';
+                                        mensagem.textContent += ' Sugestões preenchidas no modal para revisão. Clique em Processar para gravar os vínculos com uma única origem; rateios ainda não podem ser gravados.';
+                                    }
+                                } catch (erro) {
+                                    mensagem.textContent += ` Não foi possível preencher o modal: ${erro.message}`;
+                                }
+                            }
+                            const bloco = document.createElement('section');
+                            bloco.className = 'border rounded bg-light p-3 my-2';
+                            const titulo = document.createElement('strong');
+                            titulo.textContent = 'Sugestões de vínculo';
+                            bloco.append(titulo);
+                            const lista = document.createElement('ul');
+                            lista.className = 'mb-0 mt-1';
+                            for (const sugestao of nota.sugestoesVenda) {
+                                const item = document.createElement('li');
+                                const quantidade = valor => valor.toLocaleString('pt-BR', { maximumFractionDigits: 5 });
+                                const { unidade, quantidadeSolicitada, quantidadeFaltante } = sugestao;
+                                item.textContent = `Item ${sugestao.seqIpc} (${sugestao.codPro}): ${quantidade(quantidadeSolicitada)} ${unidade}`;
+                                const vendas = document.createElement('ul');
+                                for (const venda of sugestao.vendas) {
+                                    const origem = document.createElement('li');
+                                    origem.textContent = `Venda ${venda.numNfv}/${venda.codSnf}, filial ${venda.codFil}, item ${venda.seqIpv} — ${quantidade(venda.quantidade)} ${unidade}`;
+                                    vendas.append(origem);
+                                }
+                                if (!sugestao.vendas.length || quantidadeFaltante > 0) {
+                                    const saldo = document.createElement('li');
+                                    const faltante = `Faltam ${quantidade(quantidadeFaltante)} ${unidade}.`;
+                                    saldo.textContent = sugestao.vendas.length
+                                        ? faltante
+                                        : `Nenhuma venda compatível com saldo. ${faltante}`;
+                                    vendas.append(saldo);
+                                }
+                                item.append(vendas);
+                                lista.append(item);
+                            }
+                            bloco.append(lista);
+                            painel.append(bloco);
+                        }
+
                         if (nota.sucesso) {
                             const chave = chaveDoResultado(nota);
                             const { linha, caixa } = linhas.get(chave);
-                            linha.querySelector('.situacao-nota').textContent = '1';
+                            linha.querySelector('.situacao-nota').textContent = novaSituacao;
                             caixa.checked = false;
-                            caixa.disabled = true;
                             if (!linha.querySelector('.btn-ver-itens').classList.contains('text-warning'))
                                 delete estado[chave];
                         }
@@ -617,9 +867,16 @@
                     painel.textContent = `Lote sem confirmação. ${erro.message} Confira as notas no ERP antes de reenviar.`;
                 } finally {
                     grid.inert = false;
-                    btnProcessar.disabled = btnReabilitar.disabled = false;
+                    btnProcessar.disabled = btnReabilitar.disabled = btnFechar.disabled = false;
                 }
-            });
+            }
+
+            btnReabilitar.addEventListener('click', () => alterarSituacao(
+                '@Url.Action("ReabilitarNotas", "NotasEntradas")', '2', '1',
+                'Selecione ao menos uma nota fechada.', 'Reabilitando notas na Senior...'));
+            btnFechar.addEventListener('click', () => alterarSituacao(
+                '@Url.Action("FecharNotas", "NotasEntradas")', '1', '2',
+                'Selecione ao menos uma nota digitada.', 'Fechando notas na Senior...'));
 
             btnProcessar.addEventListener('click', async function () {
                 this.disabled = true;
@@ -634,7 +891,7 @@
                     }
 
                     const token = document.querySelector('#tokenProcessamento input').value;
-                    btnReabilitar.disabled = true;
+                    btnReabilitar.disabled = btnFechar.disabled = true;
                     grid.inert = true;
                     painel.textContent = 'Gravando alterações na Senior...';
                     envioEmAndamento = true;
@@ -674,6 +931,11 @@
                                     campo.dataset.original = campo.value;
                                     campo.classList.remove('campo-alterado');
                                 }
+                                const nomeTransportadora = tr.querySelector('.nome-transportadora');
+                                if (nomeTransportadora) {
+                                    nomeTransportadora.dataset.original = nomeTransportadora.textContent;
+                                    nomeTransportadora.classList.remove('campo-alterado');
+                                }
                                 delete estado[chave];
                                 tr.querySelector('.btn-ver-itens').classList.remove('text-warning');
                                 marcarLinha(tr);
@@ -693,7 +955,7 @@
                         : erro.message;
                 } finally {
                     grid.inert = false;
-                    btnReabilitar.disabled = false;
+                    btnReabilitar.disabled = btnFechar.disabled = false;
                     this.disabled = false;
                 }
             });

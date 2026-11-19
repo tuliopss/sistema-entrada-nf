@@ -8,17 +8,24 @@ namespace SistemaEntradaNotaFiscal.Controllers {
     [Authorize]
     public class NotasEntradasController : Controller {
         private readonly NotasEntradasService _notasEntradasService;
+        private readonly NotaVendaService _notaVendaService;
         private readonly ProdutoService _produtoService;
+        private readonly TransportadoraService _transportadoraService;
         private readonly ProcessamentoNotaService _processamentoNotaService;
         private readonly ReabilitacaoNotaService _reabilitacaoNotaService;
+        private readonly FechamentoNotaService _fechamentoNotaService;
         private const int pageSize = 20;
 
-        public NotasEntradasController(NotasEntradasService notasEntradasService, ProdutoService produtoService,
-            ProcessamentoNotaService processamentoNotaService, ReabilitacaoNotaService reabilitacaoNotaService) {
+        public NotasEntradasController(NotasEntradasService notasEntradasService, NotaVendaService notaVendaService, ProdutoService produtoService,
+            ProcessamentoNotaService processamentoNotaService, ReabilitacaoNotaService reabilitacaoNotaService,
+            FechamentoNotaService fechamentoNotaService, TransportadoraService transportadoraService) {
             _notasEntradasService = notasEntradasService;
+            _notaVendaService = notaVendaService;
             _produtoService = produtoService;
             _processamentoNotaService = processamentoNotaService;
             _reabilitacaoNotaService = reabilitacaoNotaService;
+            _fechamentoNotaService = fechamentoNotaService;
+            _transportadoraService = transportadoraService;
         }
 
         public IActionResult Index() {
@@ -50,6 +57,14 @@ namespace SistemaEntradaNotaFiscal.Controllers {
             var result = await _notasEntradasService.ListarItens(numNfc, codEmp, codFil, codFor, codSnf, cancellationToken);
 
             return Ok(result);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> BuscarTransportadora(int codTra, CancellationToken cancellationToken) {
+            if (codTra <= 0) return BadRequest("Informe um código de transportadora válido.");
+            var transportadora = await _transportadoraService.BuscarAsync(codTra, cancellationToken);
+            if (transportadora == null) return NotFound("Transportadora não encontrada.");
+            return Json(new { transportadora.CodTra, transportadora.NomTra });
         }
 
         [HttpGet]
@@ -97,9 +112,28 @@ namespace SistemaEntradaNotaFiscal.Controllers {
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ReabilitarNotas(
-            [FromBody] List<ReabilitarNotaRequest> notas, CancellationToken cancellationToken) {
+            [FromBody] List<ChaveNotaRequest> notas, CancellationToken cancellationToken) {
+            var erro = ValidarChaves(notas);
+            if (erro != null) return erro;
+
+            Response.Headers.CacheControl = "no-store";
+            return Ok(await _reabilitacaoNotaService.ReabilitarLoteAsync(notas, cancellationToken));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> FecharNotas(
+            [FromBody] List<ChaveNotaRequest> notas, CancellationToken cancellationToken) {
+            var erro = ValidarChaves(notas);
+            if (erro != null) return erro;
+
+            Response.Headers.CacheControl = "no-store";
+            return Ok(await _fechamentoNotaService.FecharLoteAsync(notas, cancellationToken));
+        }
+
+        private IActionResult? ValidarChaves(List<ChaveNotaRequest> notas) {
             if (!ModelState.IsValid || notas == null || notas.Count == 0)
-                return BadRequest("Informe as notas para reabilitação.");
+                return BadRequest("Informe as notas selecionadas.");
 
             if (notas.Count > 100)
                 return BadRequest("O lote excede o limite de 100 notas.");
@@ -112,8 +146,32 @@ namespace SistemaEntradaNotaFiscal.Controllers {
                 .Any(g => g.Count() > 1))
                 return BadRequest("O lote contém notas duplicadas.");
 
-            Response.Headers.CacheControl = "no-store";
-            return Ok(await _reabilitacaoNotaService.ReabilitarLoteAsync(notas, cancellationToken));
+            return null;
+        }
+
+
+        [HttpGet]
+        public async Task<IActionResult> NotaVenda(
+            [FromQuery] ChaveNotaRequest nota, CancellationToken cancellationToken) {
+            var erro = ValidarChaves([nota]);
+            if (erro != null) return erro;
+
+            var itens = await _notaVendaService.RecuperarNotasVendaEntrada(nota, cancellationToken);
+            return Json(itens);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> UltimasVendas(
+            [FromQuery] ChaveNotaRequest nota, CancellationToken cancellationToken) {
+            //var erro = ValidarChaves([nota]);
+            //if (erro != null) return erro;
+
+            var notas = await _notaVendaService.VendasUltimos6mesesCliente(nota, cancellationToken);
+            Console.WriteLine("CONTROLLER: " + nota);
+            if (notas == null)
+                return NotFound("Nota de entrada não encontrada.");
+
+            return Json(notas);
         }
     }
 }

@@ -16,15 +16,21 @@ namespace SistemaEntradaNotaFiscal.Models {
         public string ApeFor { get; set; }
 
         [Column("DocIde")]
-        public string DocIde { get; set; }
+        public string? DocIde { get; set; }
+
+        [Column("CodCli")]
+        public int? CodCli { get; set; }
+        [JsonIgnore]
+        public Cliente? Cliente { get; set; }
 
         public Fornecedor() { }
 
-        public Fornecedor(int codFor, string nomFor, string apeFor, string docIde) {
+        public Fornecedor(int codFor, string nomFor, string apeFor, string docIde, int codCli) {
             CodFor = codFor;
             NomFor = nomFor;
             ApeFor = apeFor;
             DocIde = docIde;
+            CodCli = codCli;
         }
     }
 }

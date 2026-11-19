@@ -10,4 +10,5 @@ public class ResultadoProcessamentoDto {
     public bool Sucesso { get; set; }
     public string Mensagem { get; set; } = string.Empty;
     public bool ConfirmacaoPendente { get; set; }
+    public IReadOnlyList<SugestaoVinculoVendaDto>? SugestoesVenda { get; set; }
 }

@@ -10,7 +10,9 @@ public class NotaCompletaDto {
 
     public DateTime DatEnt { get; set; }
     public DateTime DatEmi { get; set; }
+    public string? ChvNel { get; init; }
     public string? TnsPro { get; set; }
+    public int? CodTra { get; set; }
 
     public List<ProdutoNotaDto> Produtos { get; set; } = new();
     public required IReadOnlyList<ParcelaNotaDto> Parcelas { get; init; }
