@@ -8,10 +8,16 @@ DotNetEnv.Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddEnvironmentVariables();
+var connectionString = builder.Configuration.GetConnectionString("HmlContext");
+if (string.IsNullOrWhiteSpace(connectionString))
+    connectionString = builder.Configuration["HMLCONTEXT"];
+
+if (string.IsNullOrWhiteSpace(connectionString))
+    throw new InvalidOperationException(
+        "Configure a conexão com o banco em ConnectionStrings:HmlContext no appsettings.json ou na variável HMLCONTEXT.");
+
 builder.Services.AddDbContext<HmlContext>(options =>
-    options.UseSqlServer(
-            Environment.GetEnvironmentVariable("HMLCONTEXT")
-        )
+    options.UseSqlServer(connectionString)
 );
 
 builder.Configuration["Senior:Url"] ??= builder.Configuration["SENIOR_URL"];
