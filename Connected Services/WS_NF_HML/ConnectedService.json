@@ -10,7 +10,7 @@
     "namespaceMappings": [
       "*, WS_NF_HML"
     ],
-    "targetFramework": "net9.0",
+    "targetFramework": "net10.0",
     "typeReuseMode": "All"
   }
 }
